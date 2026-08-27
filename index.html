@@ -73,6 +73,21 @@
     outline: 2px solid var(--accent);
     outline-offset: 1px;
   }
+  .radio-row {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    padding-top: 2px;
+  }
+  .radio-row label {
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+    color: var(--ink);
+    cursor: pointer;
+  }
   .hint {
     grid-column: 1 / -1;
     font-size: 11.5px;
@@ -261,7 +276,14 @@
     <label for="occPerFloor">Occupants per floor</label>
     <input type="number" id="occPerFloor" min="1" max="200" value="24">
   </div>
-  <div class="hint">Editing storeys resets the height to storeys × 3 m. Edit the height field afterward for a custom floor-to-floor size. The dimension line always tracks the height field. Unit lines split each floor into equal bays based on the units count.</div>
+  <div class="field" style="grid-column: 1 / -1;">
+    <label>Dimension shown as</label>
+    <div class="radio-row">
+      <label><input type="radio" name="dimMode" value="metres" checked> Height in metres</label>
+      <label><input type="radio" name="dimMode" value="storeys"> Number of storeys</label>
+    </div>
+  </div>
+  <div class="hint">Editing storeys resets the height to storeys × 3 m — nudge the height field afterward for a custom floor-to-floor size. The dimension line always tracks the height field. Unit lines split each floor into equal bays based on the units count.</div>
   <div class="controls-footer">
     <button class="sync-btn" id="syncBtn" title="Rewrite the bullets below from the current model values">Sync notes from model</button>
   </div>
@@ -269,7 +291,7 @@
 
 <div class="card">
   <div class="card-title">
-    <input id="titleInput" type="text" value="Click to edit title">
+    <input id="titleInput" type="text" value="BCBC Single Egress Stair">
   </div>
 
   <div class="diagram-area">
@@ -303,6 +325,7 @@
   const heightInput = document.getElementById('heightFt');
   const unitsInput = document.getElementById('unitsPerFloor');
   const occInput = document.getElementById('occPerFloor');
+  const dimModeInputs = document.getElementsByName('dimMode');
   const notesList = document.getElementById('notesList');
   const syncBtn = document.getElementById('syncBtn');
   const svg = document.getElementById('svgCanvas');
@@ -312,6 +335,11 @@
 
   function formatMetres(m) {
     return m.toFixed(1).replace(/\.0$/, '.0') + ' m';
+  }
+
+  function getDimMode() {
+    for (const r of dimModeInputs) if (r.checked) return r.value;
+    return 'metres';
   }
 
   // Isometric projection (unscaled offset — bounding box computed after, so nothing gets cropped)
@@ -415,7 +443,11 @@
     const midY = (dimTop[1] + dimBase[1]) / 2;
     const labelX = dimX - 10;
     track([labelX - 60, midY]); // reserve room for the text so it isn't cropped
-    svgParts.push(`<text x="${labelX}" y="${midY + 5}" font-size="14" font-weight="700" fill="#1a1a1a" text-anchor="end">${formatMetres(heightFt)}</text>`);
+    const dimMode = getDimMode();
+    const dimLabel = dimMode === 'storeys'
+      ? `${stories} storey${stories === 1 ? '' : 's'}`
+      : formatMetres(heightFt);
+    svgParts.push(`<text x="${labelX}" y="${midY + 5}" font-size="14" font-weight="700" fill="#1a1a1a" text-anchor="end">${dimLabel}</text>`);
 
     svg.innerHTML = svgParts.join('\n');
 
@@ -470,6 +502,7 @@
   heightInput.addEventListener('input', render);
   unitsInput.addEventListener('input', render);
   occInput.addEventListener('input', render);
+  for (const r of dimModeInputs) r.addEventListener('change', render);
   syncBtn.addEventListener('click', syncNotes);
 
   document.getElementById('addNoteRow').addEventListener('click', () => {
