@@ -73,21 +73,6 @@
     outline: 2px solid var(--accent);
     outline-offset: 1px;
   }
-  .radio-row {
-    display: flex;
-    gap: 14px;
-    align-items: center;
-    padding-top: 2px;
-  }
-  .radio-row label {
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-weight: 500;
-    color: var(--ink);
-    cursor: pointer;
-  }
   .hint {
     grid-column: 1 / -1;
     font-size: 11.5px;
@@ -250,13 +235,6 @@
     <label for="occPerFloor">Occupants per floor</label>
     <input type="number" id="occPerFloor" min="1" max="200" value="24">
   </div>
-  <div class="field" style="grid-column: 1 / -1;">
-    <label>Stair position</label>
-    <div class="radio-row">
-      <label><input type="radio" name="stairPos" value="center" checked> Within the model (center)</label>
-      <label><input type="radio" name="stairPos" value="side"> At the side</label>
-    </div>
-  </div>
   <div class="hint">Editing storeys resets the height to storeys × 3 m — nudge the height field afterward for a custom floor-to-floor size. The dimension line always tracks the height field. Unit lines split each floor into equal bays based on the units count.</div>
   <div class="controls-footer">
     <button class="sync-btn" id="syncBtn" title="Rewrite the bullets below from the current model values">Sync notes from model</button>
@@ -295,7 +273,6 @@
   const heightInput = document.getElementById('heightFt');
   const unitsInput = document.getElementById('unitsPerFloor');
   const occInput = document.getElementById('occPerFloor');
-  const stairPosInputs = document.getElementsByName('stairPos');
   const notesList = document.getElementById('notesList');
   const syncBtn = document.getElementById('syncBtn');
   const svg = document.getElementById('svgCanvas');
@@ -305,11 +282,6 @@
 
   function formatMetres(m) {
     return m.toFixed(1).replace(/\.0$/, '.0') + ' m';
-  }
-
-  function getStairPos() {
-    for (const r of stairPosInputs) if (r.checked) return r.value;
-    return 'center';
   }
 
   // Isometric projection (unscaled offset — bounding box computed after, so nothing gets cropped)
@@ -327,7 +299,6 @@
     const stories = Math.max(1, parseInt(storiesInput.value, 10) || 1);
     const heightFt = Math.max(1.2, parseFloat(heightInput.value) || 3);
     const units = Math.max(1, parseInt(unitsInput.value, 10) || 1);
-    const stairPos = getStairPos();
 
     const W = 7.3, D = 5.5; // fixed plan footprint (m) — only height varies with storeys
     const floorH = heightFt / stories;
@@ -364,25 +335,12 @@
       svgParts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--grid)" stroke-width="0.8"/>`);
     }
 
-    // Stair core — rendered on the LEFT face (not the frontage face), so the unit lines on the
-    // right stay visible and uncovered. Flush within the mass, or pulled out to the side corner.
+    // Stair core — a flush block set within the mass on the LEFT face (not the frontage face),
+    // so the unit lines on the right stay visible and uncovered.
     const coreWidth = W * 0.36;
-    let cx0, protrude;
-    if (stairPos === 'center') {
-      cx0 = (W - coreWidth) / 2;
-      protrude = 0;
-    } else {
-      cx0 = W * 0.58; // toward the front corner of the left face
-      protrude = 5;
-    }
-    const cy = D + protrude;
+    const cx0 = (W - coreWidth) / 2;
+    const cy = D;
 
-    if (protrude > 0) {
-      const coreSide = trackAll([P(cx0,D,0), P(cx0,cy,0), P(cx0,cy,heightFt), P(cx0,D,heightFt)]);
-      const coreTop  = trackAll([P(cx0+coreWidth,D,heightFt), P(cx0+coreWidth,cy,heightFt), P(cx0,cy,heightFt), P(cx0,D,heightFt)]);
-      svgParts.push(`<polygon points="${poly(coreSide)}" fill="#c2631f" stroke="var(--line)" stroke-width="1.1"/>`);
-      svgParts.push(`<polygon points="${poly(coreTop)}" fill="#e8874a" stroke="var(--line)" stroke-width="1.1"/>`);
-    }
     const coreFront = trackAll([P(cx0,cy,0), P(cx0+coreWidth,cy,0), P(cx0+coreWidth,cy,heightFt), P(cx0,cy,heightFt)]);
     svgParts.push(`<polygon points="${poly(coreFront)}" fill="var(--core)" stroke="var(--line)" stroke-width="1.6"/>`);
 
@@ -482,7 +440,6 @@
   heightInput.addEventListener('input', render);
   unitsInput.addEventListener('input', render);
   occInput.addEventListener('input', render);
-  for (const r of stairPosInputs) r.addEventListener('change', render);
   syncBtn.addEventListener('click', syncNotes);
 
   document.getElementById('addNoteRow').addEventListener('click', () => {
