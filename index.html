@@ -1,1 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Single Egress Stair Diagram Builder</title>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --line: #1a1a1a;
+    --paper: #ffffff;
+    --core: #d9722c;
+    --grid: #b9b9b9;
+    --panel-bg: #f6f5f2;
+    --panel-border: #d8d5cd;
+    --accent: #b9541f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 16px 60px;
+    background: #eceae5;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
 
+  h1.page-title {
+    font-size: 15px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #6b6a63;
+    margin: 0;
+    font-weight: 600;
+  }
+
+  /* ---------- Controls panel (outside the card, never in a screenshot of it) ---------- */
+  .controls {
+    width: 100%;
+    max-width: 560px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px 24px;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .field label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b6a63;
+    font-weight: 600;
+  }
+  .field input[type="number"] {
+    font-size: 15px;
+    padding: 7px 9px;
+    border: 1px solid #c9c6bc;
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+    width: 100%;
+  }
+  .field input[type="number"]:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .radio-row {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    padding-top: 2px;
+  }
+  .radio-row label {
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .hint {
+    grid-column: 1 / -1;
+    font-size: 11.5px;
+    color: #8a8779;
+    margin-top: -4px;
+  }
+  .controls-footer {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--panel-border);
+    padding-top: 12px;
+    margin-top: 2px;
+  }
+  .sync-btn {
+    font-size: 11.5px;
+    border: 1px solid #c9c6bc;
+    background: #fff;
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    color: #6b6a63;
+  }
+  .sync-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- The "layout card" — this is the part meant for screenshots/export ---------- */
+  .card {
+    width: 340px;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    display: flex;
+    flex-direction: column;
+  }
+  .card-title {
+    border-bottom: 2px solid var(--ink);
+    padding: 10px 14px;
+  }
+  .card-title input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-weight: 800;
+    font-size: 16px;
+    color: var(--ink);
+    text-align: center;
+    font-family: inherit;
+  }
+  .card-title input:focus { outline: none; background: #fbf7ee; }
+
+  .diagram-area {
+    padding: 18px 14px 10px;
+    display: flex;
+    justify-content: center;
+  }
+  #svgCanvas {
+    width: 100%;
+    max-width: 280px;
+    height: auto;
+    display: block;
+  }
+
+  .card-divider { border-top: 2px solid var(--ink); }
+
+  .notes-section {
+    padding: 12px 16px 16px;
+  }
+  .notes-heading-row {
+    margin-bottom: 8px;
+  }
+  .notes-heading-row input {
+    font-weight: 700;
+    font-size: 14px;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    color: var(--ink);
+    width: 100%;
+  }
+  .notes-heading-row input:focus { outline: none; background: #fbf7ee; }
+
+  ul.notes-list {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  ul.notes-list li:focus { outline: none; }
+  .note-item {
+    position: relative;
+    padding-right: 18px;
+  }
+  .note-text:focus {
+    background: #fbf7ee;
+    outline: none;
+  }
+  .note-remove {
+    position: absolute;
+    right: -2px;
+    top: 0;
+    border: none;
+    background: none;
+    color: #b3b0a6;
+    font-size: 15px;
+    line-height: 1.5;
+    cursor: pointer;
+    padding: 0 3px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .note-item:hover .note-remove,
+  .note-item:focus-within .note-remove {
+    opacity: 1;
+  }
+  .note-remove:hover { color: var(--accent); }
+
+  .add-note-row {
+    margin-top: 4px;
+    padding: 3px 4px 3px 20px;
+    font-size: 12.5px;
+    color: #b3b0a6;
+    cursor: pointer;
+    user-select: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .notes-section:hover .add-note-row,
+  .notes-section:focus-within .add-note-row {
+    opacity: 1;
+  }
+  .add-note-row:hover { color: var(--accent); }
+
+  .card-footer {
+    font-size: 10px;
+    color: #9a978c;
+    text-align: right;
+    padding: 4px 14px 10px;
+  }
+
+  svg text { font-family: 'Helvetica Neue', Arial, sans-serif; }
+</style>
+</head>
+<body>
+
+<h1 class="page-title">Single Egress Stair — Diagram Builder</h1>
+
+<div class="controls">
+  <div class="field">
+    <label for="stories">Storeys</label>
+    <input type="number" id="stories" min="1" max="14" value="6">
+  </div>
+  <div class="field">
+    <label for="heightFt">Height, ground to top storey (m)</label>
+    <input type="number" id="heightFt" min="2.4" max="60" step="0.1" value="18">
+  </div>
+  <div class="field">
+    <label for="unitsPerFloor">Units per floor</label>
+    <input type="number" id="unitsPerFloor" min="1" max="12" value="4">
+  </div>
+  <div class="field">
+    <label for="occPerFloor">Occupants per floor</label>
+    <input type="number" id="occPerFloor" min="1" max="200" value="24">
+  </div>
+  <div class="field" style="grid-column: 1 / -1;">
+    <label>Stair position</label>
+    <div class="radio-row">
+      <label><input type="radio" name="stairPos" value="center" checked> Within the model (center)</label>
+      <label><input type="radio" name="stairPos" value="side"> At the side</label>
+    </div>
+  </div>
+  <div class="hint">Editing storeys resets the height to storeys × 3 m — nudge the height field afterward for a custom floor-to-floor size. The dimension line always tracks the height field. Unit lines split each floor into equal bays based on the units count.</div>
+  <div class="controls-footer">
+    <button class="sync-btn" id="syncBtn" title="Rewrite the bullets below from the current model values">Sync notes from model</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">
+    <input id="titleInput" type="text" value="BCBC Single Egress Stair">
+  </div>
+
+  <div class="diagram-area">
+    <svg id="svgCanvas" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+
+  <div class="card-divider"></div>
+
+  <div class="notes-section">
+    <div class="notes-heading-row">
+      <input id="notesHeading" type="text" value="Application">
+    </div>
+    <ul class="notes-list" id="notesList">
+      <li class="note-item"><span class="note-text" contenteditable="true">Up to 6 storeys</span><button type="button" class="note-remove" aria-label="Remove note">&times;</button></li>
+      <li class="note-item"><span class="note-text" contenteditable="true">24 occupants per floor</span><button type="button" class="note-remove" aria-label="Remove note">&times;</button></li>
+      <li class="note-item"><span class="note-text" contenteditable="true">4 units per floor</span><button type="button" class="note-remove" aria-label="Remove note">&times;</button></li>
+    </ul>
+    <div class="add-note-row" id="addNoteRow">+ Add note</div>
+  </div>
+
+  <div class="card-footer">Example diagram</div>
+</div>
+
+<script>
+(function () {
+  const storiesInput = document.getElementById('stories');
+  const heightInput = document.getElementById('heightFt');
+  const unitsInput = document.getElementById('unitsPerFloor');
+  const occInput = document.getElementById('occPerFloor');
+  const stairPosInputs = document.getElementsByName('stairPos');
+  const notesList = document.getElementById('notesList');
+  const syncBtn = document.getElementById('syncBtn');
+  const svg = document.getElementById('svgCanvas');
+
+  let lastStories = parseInt(storiesInput.value, 10);
+  const SCALE = 12; // px per metre — fixed, so proportions stay honest as height changes
+
+  function formatMetres(m) {
+    return m.toFixed(1).replace(/\.0$/, '.0') + ' m';
+  }
+
+  function getStairPos() {
+    for (const r of stairPosInputs) if (r.checked) return r.value;
+    return 'center';
+  }
+
+  // Isometric projection (unscaled offset — bounding box computed after, so nothing gets cropped)
+  function project(x, y, z) {
+    const cos30 = Math.cos(Math.PI / 6);
+    const sin30 = Math.sin(Math.PI / 6);
+    const sx = (x - y) * cos30 * SCALE;
+    const sy = (x + y) * sin30 * SCALE - z * SCALE;
+    return [sx, sy];
+  }
+
+  function poly(pts) { return pts.map(p => p.join(',')).join(' '); }
+
+  function render() {
+    const stories = Math.max(1, parseInt(storiesInput.value, 10) || 1);
+    const heightFt = Math.max(1.2, parseFloat(heightInput.value) || 3);
+    const units = Math.max(1, parseInt(unitsInput.value, 10) || 1);
+    const stairPos = getStairPos();
+
+    const W = 7.3, D = 5.5; // fixed plan footprint (m) — only height varies with storeys
+    const floorH = heightFt / stories;
+    const P = (x, y, z) => project(x, y, z);
+
+    const allX = [], allY = [];
+    function track(pt) { allX.push(pt[0]); allY.push(pt[1]); return pt; }
+    function trackAll(pts) { pts.forEach(track); return pts; }
+
+    let svgParts = [];
+
+    // Main mass
+    const rightFace = trackAll([P(W,0,0), P(W,D,0), P(W,D,heightFt), P(W,0,heightFt)]);
+    const leftFace  = trackAll([P(0,D,0), P(W,D,0), P(W,D,heightFt), P(0,D,heightFt)]);
+    const topFace   = trackAll([P(0,0,heightFt), P(W,0,heightFt), P(W,D,heightFt), P(0,D,heightFt)]);
+
+    svgParts.push(`<polygon points="${poly(topFace)}" fill="#f2f1ee" stroke="var(--line)" stroke-width="1.3"/>`);
+    svgParts.push(`<polygon points="${poly(leftFace)}" fill="#e9e8e3" stroke="var(--line)" stroke-width="1.3"/>`);
+    svgParts.push(`<polygon points="${poly(rightFace)}" fill="#fbfaf8" stroke="var(--line)" stroke-width="1.3"/>`);
+
+    // Floor lines (one per storey division)
+    for (let i = 1; i < stories; i++) {
+      const z = i * floorH;
+      const a = track(P(W,0,z)), b = track(P(W,D,z)), c = track(P(0,D,z));
+      svgParts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--grid)" stroke-width="0.8"/>`);
+      svgParts.push(`<line x1="${b[0]}" y1="${b[1]}" x2="${c[0]}" y2="${c[1]}" stroke="var(--grid)" stroke-width="0.8"/>`);
+    }
+
+    // Unit lines — split the right (frontage) face into `units` equal bays per floor.
+    // This face runs along Y (0..D) horizontally on screen, so the dividers vary Y, not X.
+    for (let u = 1; u < units; u++) {
+      const y = (D / units) * u;
+      const a = track(P(W,y,0)), b = track(P(W,y,heightFt));
+      svgParts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--grid)" stroke-width="0.8"/>`);
+    }
+
+    // Stair core — rendered on the LEFT face (not the frontage face), so the unit lines on the
+    // right stay visible and uncovered. Flush within the mass, or pulled out to the side corner.
+    const coreWidth = W * 0.36;
+    let cx0, protrude;
+    if (stairPos === 'center') {
+      cx0 = (W - coreWidth) / 2;
+      protrude = 0;
+    } else {
+      cx0 = W * 0.58; // toward the front corner of the left face
+      protrude = 5;
+    }
+    const cy = D + protrude;
+
+    if (protrude > 0) {
+      const coreSide = trackAll([P(cx0,D,0), P(cx0,cy,0), P(cx0,cy,heightFt), P(cx0,D,heightFt)]);
+      const coreTop  = trackAll([P(cx0+coreWidth,D,heightFt), P(cx0+coreWidth,cy,heightFt), P(cx0,cy,heightFt), P(cx0,D,heightFt)]);
+      svgParts.push(`<polygon points="${poly(coreSide)}" fill="#c2631f" stroke="var(--line)" stroke-width="1.1"/>`);
+      svgParts.push(`<polygon points="${poly(coreTop)}" fill="#e8874a" stroke="var(--line)" stroke-width="1.1"/>`);
+    }
+    const coreFront = trackAll([P(cx0,cy,0), P(cx0+coreWidth,cy,0), P(cx0+coreWidth,cy,heightFt), P(cx0,cy,heightFt)]);
+    svgParts.push(`<polygon points="${poly(coreFront)}" fill="var(--core)" stroke="var(--line)" stroke-width="1.6"/>`);
+
+    // Floor divisions within the core
+    for (let i = 1; i < stories; i++) {
+      const z = i * floorH;
+      const a = P(cx0,cy,z), b = P(cx0+coreWidth,cy,z);
+      svgParts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#8a4315" stroke-width="0.9"/>`);
+    }
+
+    // Continuous switchback stair path — one unbroken zigzag from ground to roof, one chevron per floor
+    const xA = cx0 + coreWidth * 0.16;
+    const xB = cx0 + coreWidth * 0.84;
+    const halfStep = floorH / 2;
+    const zigPts = [];
+    for (let k = 0; k <= stories * 2; k++) {
+      const z = k * halfStep;
+      const x = (k % 2 === 0) ? xA : xB;
+      zigPts.push(P(x, cy, z));
+    }
+    svgParts.push(`<polyline points="${poly(zigPts)}" fill="none" stroke="#f5c518" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`);
+
+    // ---------- Dimension line: to the LEFT, anchored to the left face's own top-left and bottom-left corners ----------
+    const topCorner = P(0, D, heightFt);       // top-left corner of the left face
+    const bottomCorner = P(0, D, 0);           // bottom-left corner of the left face
+    const dimX = Math.min(...allX) - 46;
+
+    const dimTop = track([dimX, topCorner[1]]);
+    const dimBase = track([dimX, bottomCorner[1]]);
+
+    // horizontal extension lines connecting the dimension to the actual roof/ground points
+    svgParts.push(`<line x1="${dimTop[0]}" y1="${dimTop[1]}" x2="${topCorner[0]}" y2="${topCorner[1]}" stroke="#999" stroke-width="0.7" stroke-dasharray="2,2"/>`);
+    svgParts.push(`<line x1="${dimBase[0]}" y1="${dimBase[1]}" x2="${bottomCorner[0]}" y2="${bottomCorner[1]}" stroke="#999" stroke-width="0.7" stroke-dasharray="2,2"/>`);
+
+    // dimension line itself
+    svgParts.push(`<line x1="${dimTop[0]}" y1="${dimTop[1]}" x2="${dimBase[0]}" y2="${dimBase[1]}" stroke="var(--ink)" stroke-width="1.2"/>`);
+    // tick marks (small diagonal hatch at each end)
+    [dimTop, dimBase].forEach(pt => {
+      svgParts.push(`<line x1="${pt[0]-6}" y1="${pt[1]+5}" x2="${pt[0]+6}" y2="${pt[1]-5}" stroke="var(--ink)" stroke-width="1.4"/>`);
+    });
+
+    const midY = (dimTop[1] + dimBase[1]) / 2;
+    const labelX = dimX - 10;
+    track([labelX - 60, midY]); // reserve room for the text so it isn't cropped
+    svgParts.push(`<text x="${labelX}" y="${midY + 5}" font-size="14" font-weight="700" fill="var(--ink)" text-anchor="end">${formatMetres(heightFt)}</text>`);
+
+    svg.innerHTML = svgParts.join('\n');
+
+    // Fit the viewBox exactly to whatever was drawn, with padding — never crops regardless of storeys/height
+    const pad = 16;
+    const minX = Math.min(...allX) - pad;
+    const maxX = Math.max(...allX) + pad;
+    const minY = Math.min(...allY) - pad;
+    const maxY = Math.max(...allY) + pad;
+    svg.setAttribute('viewBox', `${minX} ${minY} ${maxX - minX} ${maxY - minY}`);
+  }
+
+  function createNoteLi(text) {
+    const li = document.createElement('li');
+    li.className = 'note-item';
+
+    const span = document.createElement('span');
+    span.className = 'note-text';
+    span.contentEditable = 'true';
+    span.textContent = text;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'note-remove';
+    btn.setAttribute('aria-label', 'Remove note');
+    btn.textContent = '\u00d7';
+    btn.addEventListener('click', () => li.remove());
+
+    li.appendChild(span);
+    li.appendChild(btn);
+    return li;
+  }
+
+  function syncNotes() {
+    const stories = parseInt(storiesInput.value, 10) || 1;
+    const units = parseInt(unitsInput.value, 10) || 0;
+    const occ = parseInt(occInput.value, 10) || 0;
+    notesList.innerHTML = '';
+    notesList.appendChild(createNoteLi(`Up to ${stories} storey${stories === 1 ? '' : 's'}`));
+    notesList.appendChild(createNoteLi(`${occ} occupant${occ === 1 ? '' : 's'} per floor`));
+    notesList.appendChild(createNoteLi(`${units} unit${units === 1 ? '' : 's'} per floor`));
+  }
+
+  storiesInput.addEventListener('input', () => {
+    const stories = parseInt(storiesInput.value, 10);
+    if (stories && stories !== lastStories) {
+      heightInput.value = stories * 3;
+      lastStories = stories;
+    }
+    render();
+  });
+  heightInput.addEventListener('input', render);
+  unitsInput.addEventListener('input', render);
+  occInput.addEventListener('input', render);
+  for (const r of stairPosInputs) r.addEventListener('change', render);
+  syncBtn.addEventListener('click', syncNotes);
+
+  document.getElementById('addNoteRow').addEventListener('click', () => {
+    const li = createNoteLi('');
+    notesList.appendChild(li);
+    li.querySelector('.note-text').focus();
+  });
+
+  render();
+  syncNotes();
+})();
+</script>
+
+</body>
+</html>
