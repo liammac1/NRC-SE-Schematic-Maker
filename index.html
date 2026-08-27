@@ -211,8 +211,29 @@
     padding: 4px 14px 10px;
   }
 
+  .copy-row {
+    display: flex;
+    justify-content: center;
+  }
+  .copy-btn {
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--ink);
+    background: #fff;
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 8px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .copy-btn:hover { background: var(--ink); color: #fff; }
+  .copy-btn.copied { border-color: #3a8a4a; color: #3a8a4a; background: #fff; }
+
   svg text { font-family: 'Helvetica Neue', Arial, sans-serif; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -235,7 +256,7 @@
     <label for="occPerFloor">Occupants per floor</label>
     <input type="number" id="occPerFloor" min="1" max="200" value="24">
   </div>
-  <div class="hint">Editing storeys resets the height to storeys × 3 m. Edit the height field afterward for a custom floor-to-floor size. The dimension line always tracks the height field. Unit lines split each floor into equal bays based on the units count.</div>
+  <div class="hint">Editing storeys resets the height to storeys × 3 m, Edit the height field afterward for a custom floor-to-floor size. The dimension line always tracks the height field. Unit lines split each floor into equal bays based on the units count.</div>
   <div class="controls-footer">
     <button class="sync-btn" id="syncBtn" title="Rewrite the bullets below from the current model values">Sync notes from model</button>
   </div>
@@ -265,6 +286,10 @@
   </div>
 
   <div class="card-footer">Example diagram</div>
+</div>
+
+<div class="copy-row">
+  <button class="copy-btn" id="copyBtn">Copy diagram</button>
 </div>
 
 <script>
@@ -315,16 +340,16 @@
     const leftFace  = trackAll([P(0,D,0), P(W,D,0), P(W,D,heightFt), P(0,D,heightFt)]);
     const topFace   = trackAll([P(0,0,heightFt), P(W,0,heightFt), P(W,D,heightFt), P(0,D,heightFt)]);
 
-    svgParts.push(`<polygon points="${poly(topFace)}" fill="#f2f1ee" stroke="var(--line)" stroke-width="1.3"/>`);
-    svgParts.push(`<polygon points="${poly(leftFace)}" fill="#e9e8e3" stroke="var(--line)" stroke-width="1.3"/>`);
-    svgParts.push(`<polygon points="${poly(rightFace)}" fill="#fbfaf8" stroke="var(--line)" stroke-width="1.3"/>`);
+    svgParts.push(`<polygon points="${poly(topFace)}" fill="#f2f1ee" stroke="#1a1a1a" stroke-width="1.3"/>`);
+    svgParts.push(`<polygon points="${poly(leftFace)}" fill="#e9e8e3" stroke="#1a1a1a" stroke-width="1.3"/>`);
+    svgParts.push(`<polygon points="${poly(rightFace)}" fill="#fbfaf8" stroke="#1a1a1a" stroke-width="1.3"/>`);
 
     // Floor lines (one per storey division)
     for (let i = 1; i < stories; i++) {
       const z = i * floorH;
       const a = track(P(W,0,z)), b = track(P(W,D,z)), c = track(P(0,D,z));
-      svgParts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--grid)" stroke-width="0.8"/>`);
-      svgParts.push(`<line x1="${b[0]}" y1="${b[1]}" x2="${c[0]}" y2="${c[1]}" stroke="var(--grid)" stroke-width="0.8"/>`);
+      svgParts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#b9b9b9" stroke-width="0.8"/>`);
+      svgParts.push(`<line x1="${b[0]}" y1="${b[1]}" x2="${c[0]}" y2="${c[1]}" stroke="#b9b9b9" stroke-width="0.8"/>`);
     }
 
     // Unit lines — split the right (frontage) face into `units` equal bays per floor.
@@ -332,7 +357,7 @@
     for (let u = 1; u < units; u++) {
       const y = (D / units) * u;
       const a = track(P(W,y,0)), b = track(P(W,y,heightFt));
-      svgParts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--grid)" stroke-width="0.8"/>`);
+      svgParts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#b9b9b9" stroke-width="0.8"/>`);
     }
 
     // Stair core — a flush block set within the mass on the LEFT face (not the frontage face),
@@ -342,7 +367,7 @@
     const cy = D;
 
     const coreFront = trackAll([P(cx0,cy,0), P(cx0+coreWidth,cy,0), P(cx0+coreWidth,cy,heightFt), P(cx0,cy,heightFt)]);
-    svgParts.push(`<polygon points="${poly(coreFront)}" fill="var(--core)" stroke="var(--line)" stroke-width="1.6"/>`);
+    svgParts.push(`<polygon points="${poly(coreFront)}" fill="#d9722c" stroke="#1a1a1a" stroke-width="1.6"/>`);
 
     // Floor divisions within the core
     for (let i = 1; i < stories; i++) {
@@ -376,16 +401,16 @@
     svgParts.push(`<line x1="${dimBase[0]}" y1="${dimBase[1]}" x2="${bottomCorner[0]}" y2="${bottomCorner[1]}" stroke="#999" stroke-width="0.7" stroke-dasharray="2,2"/>`);
 
     // dimension line itself
-    svgParts.push(`<line x1="${dimTop[0]}" y1="${dimTop[1]}" x2="${dimBase[0]}" y2="${dimBase[1]}" stroke="var(--ink)" stroke-width="1.2"/>`);
+    svgParts.push(`<line x1="${dimTop[0]}" y1="${dimTop[1]}" x2="${dimBase[0]}" y2="${dimBase[1]}" stroke="#1a1a1a" stroke-width="1.2"/>`);
     // tick marks (small diagonal hatch at each end)
     [dimTop, dimBase].forEach(pt => {
-      svgParts.push(`<line x1="${pt[0]-6}" y1="${pt[1]+5}" x2="${pt[0]+6}" y2="${pt[1]-5}" stroke="var(--ink)" stroke-width="1.4"/>`);
+      svgParts.push(`<line x1="${pt[0]-6}" y1="${pt[1]+5}" x2="${pt[0]+6}" y2="${pt[1]-5}" stroke="#1a1a1a" stroke-width="1.4"/>`);
     });
 
     const midY = (dimTop[1] + dimBase[1]) / 2;
     const labelX = dimX - 10;
     track([labelX - 60, midY]); // reserve room for the text so it isn't cropped
-    svgParts.push(`<text x="${labelX}" y="${midY + 5}" font-size="14" font-weight="700" fill="var(--ink)" text-anchor="end">${formatMetres(heightFt)}</text>`);
+    svgParts.push(`<text x="${labelX}" y="${midY + 5}" font-size="14" font-weight="700" fill="#1a1a1a" text-anchor="end">${formatMetres(heightFt)}</text>`);
 
     svg.innerHTML = svgParts.join('\n');
 
@@ -446,6 +471,42 @@
     const li = createNoteLi('');
     notesList.appendChild(li);
     li.querySelector('.note-text').focus();
+  });
+
+  const copyBtn = document.getElementById('copyBtn');
+  const cardEl = document.querySelector('.card');
+
+  copyBtn.addEventListener('click', async () => {
+    const originalLabel = copyBtn.textContent;
+    try {
+      const canvas = await html2canvas(cardEl, {
+        backgroundColor: '#ffffff',
+        scale: 2
+      });
+      canvas.toBlob(async (blob) => {
+        try {
+          if (navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            copyBtn.textContent = 'Copied!';
+            copyBtn.classList.add('copied');
+          } else {
+            throw new Error('Clipboard image write not supported');
+          }
+        } catch (err) {
+          // Fallback: open the image in a new tab so it can be saved or copied manually
+          const url = URL.createObjectURL(blob);
+          window.open(url, '_blank');
+          copyBtn.textContent = 'Opened image tab';
+        }
+        setTimeout(() => {
+          copyBtn.textContent = originalLabel;
+          copyBtn.classList.remove('copied');
+        }, 1800);
+      }, 'image/png');
+    } catch (err) {
+      copyBtn.textContent = 'Copy failed';
+      setTimeout(() => { copyBtn.textContent = originalLabel; }, 1800);
+    }
   });
 
   render();
