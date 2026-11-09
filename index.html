@@ -844,7 +844,10 @@
         pts.push([xc + ax * Math.sin(th), yc + ay * Math.cos(th), Math.max(0.02, zt - fh * th / (2 * Math.PI))]);
       }
       // out at grade through the ground floor to the street side
-      pts.push([st.stairDoorX, s.y1, 0.02], [st.stairDoorX, ym, 0.02], [st.stairDoorX, D + 3.5, 0.02]);
+      pts.push([st.stairDoorX, s.y1, 0.02], [st.stairDoorX, ym, 0.02]);
+      // with two stairs, run along the ground-floor hallway to the front door before leaving
+      if (stairs.length > 1) pts.push([L / 2, ym, 0.02], [L / 2, D + 3.5, 0.02]);
+      else pts.push([st.stairDoorX, D + 3.5, 0.02]);
 
       const scr = pts.map(q => P(q[0], q[1], q[2]));
       const col = p.pathColor;
