@@ -2,555 +2,1301 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Single Egress Stair Diagram Builder</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Single egress schematic builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --ink: #1a1a1a;
-    --line: #1a1a1a;
-    --paper: #ffffff;
-    --core: #d9722c;
-    --grid: #b9b9b9;
-    --panel-bg: #f6f5f2;
-    --panel-border: #d8d5cd;
-    --accent: #b9541f;
+    --bg: #E4E8EB;
+    --mat: #D5DCE1;
+    --matline: rgba(30, 45, 58, 0.07);
+    --matline-strong: rgba(30, 45, 58, 0.13);
+    --panel: #FFFFFF;
+    --ink: #1E2932;
+    --muted: #5E6A75;
+    --line: #D3D9DE;
+    --field: #F5F7F8;
+    --ui: #1D5E8C;
+    --warn-ink: #8A4300;
+    --warn-bg: #FFF2DF;
+    color-scheme: light;
   }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #13181D;
+      --mat: #1A2127;
+      --matline: rgba(255, 255, 255, 0.04);
+      --matline-strong: rgba(255, 255, 255, 0.08);
+      --panel: #1D242B;
+      --ink: #E3E8EC;
+      --muted: #97A3AD;
+      --line: #313C46;
+      --field: #252E36;
+      --ui: #7FB5DF;
+      --warn-ink: #F4BD74;
+      --warn-bg: #36281A;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #13181D; --mat: #1A2127; --matline: rgba(255,255,255,.04); --matline-strong: rgba(255,255,255,.08);
+    --panel: #1D242B; --ink: #E3E8EC; --muted: #97A3AD; --line: #313C46; --field: #252E36; --ui: #7FB5DF;
+    --warn-ink: #F4BD74; --warn-bg: #36281A; color-scheme: dark;
+  }
+
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
     margin: 0;
-    padding: 32px 16px 60px;
-    background: #eceae5;
-    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
     color: var(--ink);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
+    font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
   }
 
-  h1.page-title {
-    font-size: 15px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #6b6a63;
-    margin: 0;
-    font-weight: 600;
-  }
-
-  /* ---------- Controls panel (outside the card, never in a screenshot of it) ---------- */
-  .controls {
-    width: 100%;
-    max-width: 560px;
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 10px;
-    padding: 18px 22px;
+  .app {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px 24px;
+    grid-template-columns: 340px minmax(0, 1fr);
+    min-height: 100%;
   }
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+
+  /* ---------- Sidebar ---------- */
+  .side {
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    padding: 22px 20px 40px;
+    overflow-y: auto;
+    max-height: 100vh;
+    position: sticky;
+    top: 0;
   }
-  .field label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #6b6a63;
+  .brand h1 {
+    font-size: 19px;
     font-weight: 600;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
   }
-  .field input[type="number"] {
-    font-size: 15px;
-    padding: 7px 9px;
-    border: 1px solid #c9c6bc;
-    border-radius: 6px;
-    background: #fff;
+  .brand p {
+    margin: 0 0 18px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .preset-row { margin-bottom: 14px; }
+  .preset-row label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
+
+  details {
+    border-top: 1px solid var(--line);
+    padding: 10px 0 12px;
+  }
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 0;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after {
+    content: '';
+    width: 7px; height: 7px;
+    border-right: 1.5px solid var(--muted);
+    border-bottom: 1.5px solid var(--muted);
+    transform: rotate(45deg);
+    margin-right: 4px;
+    transition: transform .15s;
+  }
+  details[open] summary::after { transform: rotate(-135deg); margin-top: 4px; }
+  summary:focus-visible { outline: 2px solid var(--ui); outline-offset: 3px; border-radius: 3px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 12px;
+    margin-top: 10px;
+  }
+  .f { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .f.wide { grid-column: 1 / -1; }
+  .f > span { font-size: 12.5px; color: var(--muted); }
+  input[type="number"], input[type="text"], select, textarea {
+    font: inherit;
+    font-size: 14px;
     color: var(--ink);
+    background: var(--field);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 6px 8px;
     width: 100%;
+    min-width: 0;
   }
-  .field input[type="number"]:focus {
-    outline: 2px solid var(--accent);
+  textarea { resize: vertical; min-height: 64px; line-height: 1.4; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+    outline: 2px solid var(--ui);
     outline-offset: 1px;
   }
-  .radio-row {
-    display: flex;
-    gap: 14px;
-    align-items: center;
-    padding-top: 2px;
+  .ratio { display: flex; align-items: center; gap: 6px; }
+  .ratio b { font-weight: 500; color: var(--muted); white-space: nowrap; }
+  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-top: 10px; }
+  .checks label { display: flex; align-items: center; gap: 7px; font-size: 13.5px; cursor: pointer; }
+  .checks input { accent-color: var(--ui); width: 15px; height: 15px; margin: 0; }
+  .hint { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
+  .colour { display: flex; align-items: center; gap: 8px; }
+  .colour input[type="color"] { width: 34px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: none; cursor: pointer; }
+  .linkbtn {
+    background: none; border: none; color: var(--ui); font: inherit; font-size: 13px; padding: 0; cursor: pointer;
+    text-decoration: underline; text-underline-offset: 2px;
   }
-  .radio-row label {
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-weight: 500;
-    color: var(--ink);
-    cursor: pointer;
-  }
-  .hint {
-    grid-column: 1 / -1;
-    font-size: 11.5px;
-    color: #8a8779;
-    margin-top: -4px;
-  }
-  .controls-footer {
-    grid-column: 1 / -1;
-    display: flex;
-    justify-content: flex-end;
-    border-top: 1px solid var(--panel-border);
-    padding-top: 12px;
-    margin-top: 2px;
-  }
-  .sync-btn {
-    font-size: 11.5px;
-    border: 1px solid #c9c6bc;
-    background: #fff;
-    border-radius: 6px;
-    padding: 6px 12px;
-    cursor: pointer;
-    color: #6b6a63;
-  }
-  .sync-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* ---------- The "layout card" — this is the part meant for screenshots/export ---------- */
-  .card {
-    width: 340px;
-    background: var(--paper);
-    border: 2px solid var(--ink);
+  /* ---------- Sheets ---------- */
+  main {
+    padding: 22px 24px 48px;
     display: flex;
     flex-direction: column;
+    gap: 22px;
+    min-width: 0;
   }
-  .card-title {
-    border-bottom: 2px solid var(--ink);
-    padding: 10px 14px;
+  .sheet {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
   }
-  .card-title input {
-    width: 100%;
-    border: none;
-    background: transparent;
-    font-weight: 800;
-    font-size: 16px;
-    color: var(--ink);
-    text-align: center;
-    font-family: inherit;
-  }
-  .card-title input:focus { outline: none; background: #fbf7ee; }
-
-  .diagram-area {
-    padding: 18px 14px 10px;
-    display: flex;
-    justify-content: center;
-  }
-  #svgCanvas {
-    width: 100%;
-    max-width: 280px;
-    height: auto;
-    display: block;
-  }
-
-  .card-divider { border-top: 2px solid var(--ink); }
-
-  .notes-section {
-    padding: 12px 16px 16px;
-  }
-  .notes-heading-row {
-    margin-bottom: 8px;
-  }
-  .notes-heading-row input {
-    font-weight: 700;
-    font-size: 14px;
-    border: none;
-    background: transparent;
-    font-family: inherit;
-    color: var(--ink);
-    width: 100%;
-  }
-  .notes-heading-row input:focus { outline: none; background: #fbf7ee; }
-
-  ul.notes-list {
-    margin: 0;
-    padding-left: 20px;
-    font-size: 13.5px;
-    line-height: 1.55;
-  }
-  ul.notes-list li:focus { outline: none; }
-  .note-item {
-    position: relative;
-    padding-right: 18px;
-  }
-  .note-text:focus {
-    background: #fbf7ee;
-    outline: none;
-  }
-  .note-remove {
-    position: absolute;
-    right: -2px;
-    top: 0;
-    border: none;
-    background: none;
-    color: #b3b0a6;
-    font-size: 15px;
-    line-height: 1.5;
-    cursor: pointer;
-    padding: 0 3px;
-    opacity: 0;
-    transition: opacity 0.15s;
-  }
-  .note-item:hover .note-remove,
-  .note-item:focus-within .note-remove {
-    opacity: 1;
-  }
-  .note-remove:hover { color: var(--accent); }
-
-  .add-note-row {
-    margin-top: 4px;
-    padding: 3px 4px 3px 20px;
-    font-size: 12.5px;
-    color: #b3b0a6;
-    cursor: pointer;
-    user-select: none;
-    opacity: 0;
-    transition: opacity 0.15s;
-  }
-  .notes-section:hover .add-note-row,
-  .notes-section:focus-within .add-note-row {
-    opacity: 1;
-  }
-  .add-note-row:hover { color: var(--accent); }
-
-  .card-footer {
-    font-size: 10px;
-    color: #9a978c;
-    text-align: right;
-    padding: 4px 14px 10px;
-  }
-  .card-footer[contenteditable="true"]:focus {
-    outline: none;
-    background: #fbf7ee;
-    color: var(--ink);
-  }
-
-  .copy-row {
-    display: flex;
-    justify-content: center;
-  }
-  .copy-btn {
-    font-size: 13px;
-    font-weight: 600;
-    border: 1px solid var(--ink);
-    background: #fff;
-    color: var(--ink);
-    border-radius: 6px;
-    padding: 8px 16px;
-    cursor: pointer;
+  .sheet > header {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
   }
-  .copy-btn:hover { background: var(--ink); color: #fff; }
-  .copy-btn.copied { border-color: #3a8a4a; color: #3a8a4a; background: #fff; }
+  .sheet h2 { font-size: 15px; font-weight: 600; margin: 0; }
+  .meta { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .actions button {
+    font: inherit; font-size: 13px; font-weight: 500;
+    color: var(--ink);
+    background: var(--field);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 6px 11px;
+    cursor: pointer;
+  }
+  .actions button:hover { border-color: var(--ui); color: var(--ui); }
+  .actions button.primary { background: var(--ui); border-color: var(--ui); color: var(--panel); }
+  .actions button.primary:hover { filter: brightness(1.08); color: var(--panel); }
+  .actions button.done { border-color: #2E7D4F; color: #2E7D4F; }
+  .warn {
+    margin: 0;
+    padding: 9px 16px;
+    background: var(--warn-bg);
+    color: var(--warn-ink);
+    font-size: 13px;
+    border-bottom: 1px solid var(--line);
+  }
 
-  svg text { font-family: 'Helvetica Neue', Arial, sans-serif; }
+  /* the cutting-mat: a 10 mm drafting grid behind the paper, at preview scale */
+  .mat {
+    --cell: 34px;
+    background-color: var(--mat);
+    background-image:
+      linear-gradient(var(--matline-strong) 1px, transparent 1px),
+      linear-gradient(90deg, var(--matline-strong) 1px, transparent 1px),
+      linear-gradient(var(--matline) 1px, transparent 1px),
+      linear-gradient(90deg, var(--matline) 1px, transparent 1px);
+    background-size: calc(var(--cell) * 5) calc(var(--cell) * 5), calc(var(--cell) * 5) calc(var(--cell) * 5), var(--cell) var(--cell), var(--cell) var(--cell);
+    padding: 34px;
+    overflow-x: auto;
+    display: flex;
+    justify-content: center;
+  }
+  .paper { line-height: 0; }
+  .paper svg {
+    display: block;
+    height: auto;
+    max-width: 100%;
+    box-shadow: 0 1px 2px rgba(20, 30, 40, 0.18), 0 6px 18px rgba(20, 30, 40, 0.10);
+  }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .side { position: static; max-height: none; border-right: none; border-bottom: 1px solid var(--line); }
+    main { padding: 16px 12px 40px; }
+    .mat { padding: 16px; }
+  }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
-
-<h1 class="page-title">Single Egress Stair — Diagram Builder</h1>
-
-<div class="controls">
-  <div class="field">
-    <label for="stories">Storeys</label>
-    <input type="number" id="stories" min="1" max="14" value="6">
-  </div>
-  <div class="field">
-    <label for="heightFt">Height, ground to top storey (m)</label>
-    <input type="number" id="heightFt" min="2.4" max="60" step="0.1" value="18">
-  </div>
-  <div class="field">
-    <label for="unitsPerFloor">Units per floor</label>
-    <input type="number" id="unitsPerFloor" min="1" max="12" value="4">
-  </div>
-  <div class="field">
-    <label for="occPerFloor">Occupants per floor</label>
-    <input type="number" id="occPerFloor" min="1" max="200" value="24">
-  </div>
-  <div class="field" style="grid-column: 1 / -1;">
-    <label>Dimension shown as</label>
-    <div class="radio-row">
-      <label><input type="radio" name="dimMode" value="metres" checked> Height in metres</label>
-      <label><input type="radio" name="dimMode" value="storeys"> Number of storeys</label>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <h1>Single egress schematics</h1>
+      <p>Isometrics and floor plans drawn at a fixed print scale, so every export sits side by side in the report at true relative size.</p>
     </div>
-  </div>
-  <div class="hint">Editing storeys resets the height to storeys × 3 m. Edit the height field afterward for a custom floor-to-floor size. The dimension line always tracks the height field. Unit lines split each floor into equal bays based on the units count.</div>
-  <div class="controls-footer">
-    <button class="sync-btn" id="syncBtn" title="Rewrite the bullets below from the current model values">Sync notes from model</button>
-  </div>
-</div>
 
-<div class="card">
-  <div class="card-title">
-    <input id="titleInput" type="text" value="Click to edit title">
-  </div>
-
-  <div class="diagram-area">
-    <svg id="svgCanvas" xmlns="http://www.w3.org/2000/svg"></svg>
-  </div>
-
-  <div class="card-divider"></div>
-
-  <div class="notes-section">
-    <div class="notes-heading-row">
-      <input id="notesHeading" type="text" value="Application">
+    <div class="preset-row">
+      <label for="preset">Start from</label>
+      <select id="preset"></select>
     </div>
-    <ul class="notes-list" id="notesList">
-      <li class="note-item"><span class="note-text" contenteditable="true">Up to 6 storeys</span><button type="button" class="note-remove" aria-label="Remove note">&times;</button></li>
-      <li class="note-item"><span class="note-text" contenteditable="true">24 occupants per floor</span><button type="button" class="note-remove" aria-label="Remove note">&times;</button></li>
-      <li class="note-item"><span class="note-text" contenteditable="true">4 units per floor</span><button type="button" class="note-remove" aria-label="Remove note">&times;</button></li>
-    </ul>
-    <div class="add-note-row" id="addNoteRow">+ Add note</div>
-  </div>
 
-  <div class="card-footer" contenteditable="true">Example diagram</div>
-</div>
+    <details open>
+      <summary>Building</summary>
+      <div class="grid">
+        <label class="f"><span>Length (m)</span><input type="number" id="len" min="6" max="250" step="0.5"></label>
+        <label class="f"><span>Depth (m)</span><input type="number" id="dep" min="8" max="60" step="0.5"></label>
+        <label class="f"><span>Storeys</span><input type="number" id="storeys" min="1" max="16" step="1"></label>
+        <label class="f"><span>Floor to floor (m)</span><input type="number" id="fh" min="2.4" max="6" step="0.1"></label>
+        <label class="f"><span>Units per storey</span><input type="number" id="units" min="2" max="40" step="1"></label>
+        <label class="f"><span>Occupants per storey</span><input type="number" id="occ" min="0" max="400" step="1"></label>
+        <label class="f"><span>Exit stairs</span>
+          <select id="stairs"><option value="1">One (single egress)</option><option value="2">Two</option></select></label>
+        <label class="f"><span>Stair width (m)</span><input type="number" id="flight" min="0.9" max="2" step="0.05"></label>
+        <label class="f"><span>Corridor width (m)</span><input type="number" id="cw" min="0.9" max="4" step="0.1"></label>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="elev"> Elevator</label>
+        <label><input type="checkbox" id="vest"> Stair vestibule</label>
+      </div>
+    </details>
 
-<div class="copy-row">
-  <button class="copy-btn" id="copyBtn">Copy diagram</button>
+    <details open>
+      <summary>Isometric</summary>
+      <div class="grid">
+        <label class="f"><span>Style</span>
+          <select id="isoStyle"><option value="solid">Solid massing</option><option value="xray">See-through core</option></select></label>
+        <label class="f"><span>Height label</span>
+          <select id="hlabel"><option value="m">Metres</option><option value="storeys">Storeys</option><option value="both">Both</option></select></label>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="balc"> Balconies</label>
+        <label><input type="checkbox" id="overrun"> Stair overrun</label>
+        <label><input type="checkbox" id="context"> Trees and ground</label>
+        <label><input type="checkbox" id="isoDims"> Dimensions</label>
+      </div>
+    </details>
+
+    <details>
+      <summary>Floor plan</summary>
+      <div class="checks">
+        <label><input type="checkbox" id="planLabels"> Unit labels</label>
+        <label><input type="checkbox" id="planDoors"> Door swings</label>
+        <label><input type="checkbox" id="planTravel"> Travel distances</label>
+        <label><input type="checkbox" id="planDims"> Dimensions</label>
+        <label><input type="checkbox" id="planBar"> Scale bar</label>
+      </div>
+      <p class="hint">Travel lines run from each suite door to its farthest corner, and along the corridor to the nearest exit stair door.</p>
+    </details>
+
+    <details open>
+      <summary>Scale and frame</summary>
+      <div class="grid">
+        <label class="f"><span>Isometric scale</span><span class="ratio"><b>1 :</b><input type="number" id="isoScale" min="50" max="5000" step="50"></span></label>
+        <label class="f"><span>Plan scale</span><span class="ratio"><b>1 :</b><input type="number" id="planScale" min="50" max="5000" step="50"></span></label>
+        <label class="f"><span>Isometric frame</span>
+          <select id="isoFrame"><option value="shared">Shared size</option><option value="fit">Fit drawing</option></select></label>
+        <label class="f"><span>Plan frame</span>
+          <select id="planFrame"><option value="shared">Shared size</option><option value="fit">Fit drawing</option></select></label>
+      </div>
+      <p class="hint">A shared frame is sized for the largest building below, so every export has identical dimensions and the same ground line.</p>
+      <div class="grid">
+        <label class="f"><span>Largest length (m)</span><input type="number" id="maxL" min="6" max="250" step="0.5"></label>
+        <label class="f"><span>Largest depth (m)</span><input type="number" id="maxD" min="8" max="60" step="0.5"></label>
+        <label class="f"><span>Most storeys</span><input type="number" id="maxS" min="1" max="16" step="1"></label>
+        <label class="f"><span>PNG resolution</span>
+          <select id="dpi"><option value="200">200 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option></select></label>
+      </div>
+      <p class="hint"><button type="button" class="linkbtn" id="fitPresets">Size the frame for all six archetypes</button></p>
+    </details>
+
+    <details>
+      <summary>Caption</summary>
+      <div class="grid">
+        <label class="f wide"><span>Title (blank uses an automatic title)</span><input type="text" id="title"></label>
+        <label class="f wide"><span>Notes, one per line (blank uses building values)</span><textarea id="notes"></textarea></label>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="caption"> Show caption</label>
+        <label><input type="checkbox" id="scaleNote"> Show scale</label>
+        <label><input type="checkbox" id="whiteBg"> White background</label>
+      </div>
+    </details>
+
+    <details>
+      <summary>Colour</summary>
+      <div class="grid">
+        <label class="f"><span>Exit stair</span><span class="colour"><input type="color" id="accent"></span></label>
+        <label class="f"><span>Balconies</span><span class="colour"><input type="color" id="balcColor"></span></label>
+        <label class="f"><span>Corridor</span><span class="colour"><input type="color" id="circColor"></span></label>
+      </div>
+      <p class="hint"><button type="button" class="linkbtn" id="resetColours">Reset colours</button></p>
+    </details>
+  </aside>
+
+  <main>
+    <article class="sheet">
+      <header>
+        <h2>Isometric</h2>
+        <span class="meta" id="isoMeta"></span>
+        <div class="actions">
+          <button type="button" data-kind="iso" data-act="copy">Copy image</button>
+          <button type="button" data-kind="iso" data-act="svg">Download SVG</button>
+          <button type="button" class="primary" data-kind="iso" data-act="png">Download PNG</button>
+        </div>
+      </header>
+      <p class="warn" id="isoWarn" hidden></p>
+      <div class="mat"><div class="paper" id="isoOut"></div></div>
+    </article>
+
+    <article class="sheet">
+      <header>
+        <h2>Floor plan</h2>
+        <span class="meta" id="planMeta"></span>
+        <div class="actions">
+          <button type="button" data-kind="plan" data-act="copy">Copy image</button>
+          <button type="button" data-kind="plan" data-act="svg">Download SVG</button>
+          <button type="button" class="primary" data-kind="plan" data-act="png">Download PNG</button>
+        </div>
+      </header>
+      <p class="warn" id="planWarn" hidden></p>
+      <div class="mat"><div class="paper" id="planOut"></div></div>
+    </article>
+  </main>
 </div>
 
 <script>
 (function () {
-  const storiesInput = document.getElementById('stories');
-  const heightInput = document.getElementById('heightFt');
-  const unitsInput = document.getElementById('unitsPerFloor');
-  const occInput = document.getElementById('occPerFloor');
-  const dimModeInputs = document.getElementsByName('dimMode');
-  const notesList = document.getElementById('notesList');
-  const syncBtn = document.getElementById('syncBtn');
-  const svg = document.getElementById('svgCanvas');
+  'use strict';
 
-  let lastStories = parseInt(storiesInput.value, 10);
-  const SCALE = 12; // px per metre — fixed, so proportions stay honest as height changes
+  const $ = id => document.getElementById(id);
+  const C30 = Math.cos(Math.PI / 6);
+  const INK = '#25303A';
+  const PREVIEW_PX_PER_MM = 3.4;          // screen preview only; exports use real mm
+  const r2 = v => Math.round(v * 100) / 100;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const fmtM = v => (Math.round(v * 10) / 10).toFixed(1) + '\u202Fm';
+  const fmtN = v => String(+(+v).toFixed(1));
 
-  function formatMetres(m) {
-    return m.toFixed(1).replace(/\.0$/, '.0') + ' m';
+  const DEFAULT_COLOURS = { accent: '#E2582A', balcColor: '#F0B53A', circColor: '#DCEBD6' };
+
+  /* ---------------- presets (TG-SE-RA archetypes, Table 7) ---------------- */
+  const PRESETS = [
+    { id: 'ses4', name: '4 storeys, single exit stair', v: { len: 30, dep: 20, storeys: 4, units: 4, occ: 30, stairs: 1, flight: 1.5, cw: 1.5 } },
+    { id: 'two4', name: '4 storeys, two exit stairs', v: { len: 112.5, dep: 20, storeys: 4, units: 26, occ: 96, stairs: 2, flight: 1.1, cw: 1.5 } },
+    { id: 'ses6', name: '6 storeys, single exit stair', v: { len: 30, dep: 20, storeys: 6, units: 4, occ: 30, stairs: 1, flight: 1.5, cw: 1.5 } },
+    { id: 'two6', name: '6 storeys, two exit stairs', v: { len: 75, dep: 20, storeys: 6, units: 18, occ: 64, stairs: 2, flight: 1.1, cw: 1.5 } },
+    { id: 'ses3', name: '3 storeys, single exit stair', v: { len: 30, dep: 20, storeys: 3, units: 6, occ: 26, stairs: 1, flight: 1.5, cw: 1.5 } },
+    { id: 'two3', name: '3 storeys, two exit stairs', v: { len: 40, dep: 20, storeys: 3, units: 12, occ: 32, stairs: 2, flight: 1.1, cw: 1.5 } }
+  ];
+
+  const DEFAULTS = {
+    preset: 'ses4', len: 30, dep: 20, storeys: 4, fh: 3, units: 4, occ: 30, stairs: '1', flight: 1.5, cw: 1.5,
+    elev: true, vest: false,
+    isoStyle: 'solid', hlabel: 'm', balc: true, overrun: true, context: true, isoDims: true,
+    planLabels: true, planDoors: true, planTravel: true, planDims: true, planBar: true,
+    isoScale: 1000, planScale: 500, isoFrame: 'shared', planFrame: 'fit',
+    maxL: 112.5, maxD: 20, maxS: 6, dpi: '300',
+    title: '', notes: '', caption: true, scaleNote: true, whiteBg: true,
+    accent: DEFAULT_COLOURS.accent, balcColor: DEFAULT_COLOURS.balcColor, circColor: DEFAULT_COLOURS.circColor
+  };
+  const BUILDING_FIELDS = ['len', 'dep', 'storeys', 'fh', 'units', 'occ', 'stairs', 'flight', 'cw', 'elev', 'vest'];
+  const STORE_KEY = 'ses-schematic-builder-v2';
+
+  /* ---------------- small helpers ---------------- */
+  function hexToRgb(h) {
+    h = String(h || '#000').replace('#', '');
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    const n = parseInt(h, 16) || 0;
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function mix(a, b, t) {
+    const A = hexToRgb(a), B = hexToRgb(b);
+    return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join('');
+  }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  const ptsStr = arr => arr.map(q => r2(q[0]) + ',' + r2(q[1])).join(' ');
+  const textW = (s, size) => String(s).length * size * 0.54;
+
+  class BBox {
+    constructor() { this.x0 = Infinity; this.y0 = Infinity; this.x1 = -Infinity; this.y1 = -Infinity; }
+    add(x, y) { if (x < this.x0) this.x0 = x; if (x > this.x1) this.x1 = x; if (y < this.y0) this.y0 = y; if (y > this.y1) this.y1 = y; }
+    pts(a) { a.forEach(q => this.add(q[0], q[1])); }
+    circle(x, y, r) { this.add(x - r, y - r); this.add(x + r, y + r); }
+    text(x, y, size, s, anchor) {
+      const w = textW(s, size);
+      const xa = anchor === 'end' ? x - w : anchor === 'middle' ? x - w / 2 : x;
+      this.add(xa, y - size * 0.8); this.add(xa + w, y + size * 0.25);
+    }
+    get w() { return this.x1 - this.x0; }
+    get h() { return this.y1 - this.y0; }
   }
 
-  function getDimMode() {
-    for (const r of dimModeInputs) if (r.checked) return r.value;
-    return 'metres';
+  // A tiny drawing context: collects SVG strings and tracks the bounding box (all units mm on paper)
+  function makeCanvas() {
+    const els = [], bb = new BBox();
+    return {
+      els, bb,
+      poly(p, fill, stroke, sw, extra) {
+        bb.pts(p);
+        els.push(`<polygon points="${ptsStr(p)}" fill="${fill}"${stroke ? ` stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round"` : ''}${extra ? ' ' + extra : ''}/>`);
+      },
+      line(a, b, stroke, sw, extra) {
+        bb.pts([a, b]);
+        els.push(`<line x1="${r2(a[0])}" y1="${r2(a[1])}" x2="${r2(b[0])}" y2="${r2(b[1])}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round"${extra ? ' ' + extra : ''}/>`);
+      },
+      pl(p, stroke, sw, extra) {
+        bb.pts(p);
+        els.push(`<polyline points="${ptsStr(p)}" fill="none" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round"${extra ? ' ' + extra : ''}/>`);
+      },
+      circle(c, r, fill, stroke, sw) {
+        bb.circle(c[0], c[1], r);
+        els.push(`<circle cx="${r2(c[0])}" cy="${r2(c[1])}" r="${r2(r)}" fill="${fill}"${stroke ? ` stroke="${stroke}" stroke-width="${sw}"` : ''}/>`);
+      },
+      text(x, y, size, s, o = {}) {
+        if (o.rot != null) bb.circle(x, y - size * 0.3, textW(s, size) / 2 + size * 0.4);
+        else bb.text(x, y, size, s, o.anchor || 'start');
+        els.push(`<text x="${r2(x)}" y="${r2(y)}" font-size="${r2(size)}"${o.weight ? ` font-weight="${o.weight}"` : ''} fill="${o.fill || INK}" text-anchor="${o.anchor || 'start'}"` +
+          (o.rot != null ? ` transform="rotate(${r2(o.rot)} ${r2(x)} ${r2(y)})"` : '') +
+          (o.halo ? ` stroke="#ffffff" stroke-width="${r2(size * 0.32)}" paint-order="stroke" stroke-linejoin="round"` : '') +
+          `>${esc(s)}</text>`);
+      },
+      raw(s) { els.push(s); }
+    };
   }
 
-  // Isometric projection (unscaled offset — bounding box computed after, so nothing gets cropped)
-  function project(x, y, z) {
-    const cos30 = Math.cos(Math.PI / 6);
-    const sin30 = Math.sin(Math.PI / 6);
-    const sx = (x - y) * cos30 * SCALE;
-    const sy = (x + y) * sin30 * SCALE - z * SCALE;
-    return [sx, sy];
+  /* ---------------- read controls ---------------- */
+  function val(id) {
+    const el = $(id);
+    if (el.type === 'checkbox') return el.checked;
+    return el.value;
+  }
+  function num(id, def) { const v = parseFloat($(id).value); return isFinite(v) ? v : def; }
+
+  function readParams() {
+    return {
+      L: clamp(num('len', 30), 6, 250),
+      D: clamp(num('dep', 20), 8, 60),
+      storeys: Math.round(clamp(num('storeys', 4), 1, 16)),
+      fh: clamp(num('fh', 3), 2.4, 6),
+      units: Math.round(clamp(num('units', 4), 2, 40)),
+      occ: Math.round(clamp(num('occ', 0), 0, 400)),
+      stairs: parseInt(val('stairs'), 10) === 2 ? 2 : 1,
+      flight: clamp(num('flight', 1.1), 0.9, 2),
+      cw: clamp(num('cw', 1.5), 0.9, 4),
+      elevator: val('elev'),
+      vestibule: val('vest'),
+      isoStyle: val('isoStyle'),
+      hlabel: val('hlabel'),
+      balconies: val('balc'),
+      overrun: val('overrun'),
+      context: val('context'),
+      isoDims: val('isoDims'),
+      planLabels: val('planLabels'),
+      planDoors: val('planDoors'),
+      planTravel: val('planTravel'),
+      planDims: val('planDims'),
+      planBar: val('planBar'),
+      isoScale: clamp(num('isoScale', 1000), 50, 5000),
+      planScale: clamp(num('planScale', 500), 50, 5000),
+      isoFrame: val('isoFrame'),
+      planFrame: val('planFrame'),
+      maxL: clamp(num('maxL', 112.5), 6, 250),
+      maxD: clamp(num('maxD', 20), 8, 60),
+      maxS: Math.round(clamp(num('maxS', 6), 1, 16)),
+      dpi: parseInt(val('dpi'), 10) || 300,
+      title: val('title').trim(),
+      notes: val('notes'),
+      caption: val('caption'),
+      scaleNote: val('scaleNote'),
+      whiteBg: val('whiteBg'),
+      accent: val('accent'),
+      balc: val('balcColor'),
+      circ: val('circColor')
+    };
   }
 
-  function poly(pts) { return pts.map(p => p.join(',')).join(' '); }
+  /* ---------------- plan layout (shared by plan and isometric) ---------------- */
+  const split = (a, b, n) => Array.from({ length: n }, (_, i) => [a + (b - a) * i / n, a + (b - a) * (i + 1) / n]);
+  const rectPoly = (x0, x1, y0, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+  const doorCentre = (a, b, c0, c1) => (Math.max(a, c0) + Math.min(b, c1)) / 2;
 
-  function render() {
-    const stories = Math.max(1, parseInt(storiesInput.value, 10) || 1);
-    const heightFt = Math.max(1.2, parseFloat(heightInput.value) || 3);
-    const units = Math.max(1, parseInt(unitsInput.value, 10) || 1);
+  function allocate(n, spans) {
+    const lens = spans.map(s => s[1] - s[0]);
+    const tot = lens.reduce((a, b) => a + b, 0) || 1;
+    const raw = lens.map(l => n * l / tot);
+    const out = raw.map(Math.floor);
+    let left = n - out.reduce((a, b) => a + b, 0);
+    raw.map((r, i) => [r - Math.floor(r), i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (left > 0) { out[i]++; left--; } });
+    return out;
+  }
 
-    const W = 7.3, D = 5.5; // fixed plan footprint (m) — only height varies with storeys
-    const floorH = heightFt / stories;
-    const P = (x, y, z) => project(x, y, z);
+  function layout(p) {
+    const L = p.L, D = p.D;
+    const cw = clamp(p.cw, 0.9, D * 0.35);
+    const rd = (D - cw) / 2, yc0 = rd, yc1 = rd + cw, ym = (yc0 + yc1) / 2;
+    const shaftW = 2 * p.flight + 0.25;
+    const elevW = 2.3, elevD = Math.min(2.5, rd * 0.45);
+    const vd = p.vestibule ? Math.min(2.0, rd * 0.3) : 0;
+    const N = p.units;
+    const cores = [], units = [];
+    let corr, southBays = [];
 
-    const allX = [], allY = [];
-    function track(pt) { allX.push(pt[0]); allY.push(pt[1]); return pt; }
-    function trackAll(pts) { pts.forEach(track); return pts; }
-
-    let svgParts = [];
-
-    // Main mass
-    const rightFace = trackAll([P(W,0,0), P(W,D,0), P(W,D,heightFt), P(W,0,heightFt)]);
-    const leftFace  = trackAll([P(0,D,0), P(W,D,0), P(W,D,heightFt), P(0,D,heightFt)]);
-    const topFace   = trackAll([P(0,0,heightFt), P(W,0,heightFt), P(W,D,heightFt), P(0,D,heightFt)]);
-
-    svgParts.push(`<polygon points="${poly(topFace)}" fill="#f2f1ee" stroke="#1a1a1a" stroke-width="1.3"/>`);
-    svgParts.push(`<polygon points="${poly(leftFace)}" fill="#e9e8e3" stroke="#1a1a1a" stroke-width="1.3"/>`);
-    svgParts.push(`<polygon points="${poly(rightFace)}" fill="#fbfaf8" stroke="#1a1a1a" stroke-width="1.3"/>`);
-
-    // Floor lines (one per storey division)
-    for (let i = 1; i < stories; i++) {
-      const z = i * floorH;
-      const a = track(P(W,0,z)), b = track(P(W,D,z)), c = track(P(0,D,z));
-      svgParts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#b9b9b9" stroke-width="0.8"/>`);
-      svgParts.push(`<line x1="${b[0]}" y1="${b[1]}" x2="${c[0]}" y2="${c[1]}" stroke="#b9b9b9" stroke-width="0.8"/>`);
+    function stairCore(x0, withElev) {
+      const x1 = x0 + shaftW + (withElev ? elevW : 0);
+      const c = { x0, x1, y0: 0, y1: rd, stair: { x0, x1: x0 + shaftW, y0: 0, y1: rd - vd } };
+      if (withElev) {
+        c.elev = { x0: x0 + shaftW, x1, y0: rd - vd - elevD, y1: rd - vd };
+        c.svc = { x0: x0 + shaftW, x1, y0: 0, y1: rd - vd - elevD };
+      }
+      if (vd) c.vest = { x0, x1, y0: rd - vd, y1: rd };
+      c.stairDoorX = x0 + shaftW / 2;
+      c.doorX = vd ? (x0 + x1) / 2 : c.stairDoorX;
+      return c;
+    }
+    function elevCore(xc) {
+      const x0 = xc - elevW / 2, x1 = xc + elevW / 2;
+      return { x0, x1, y0: 0, y1: rd, elev: { x0, x1, y0: rd - elevD, y1: rd }, svc: { x0, x1, y0: 0, y1: rd - elevD } };
+    }
+    function southPoly(a, b, first, last, cx0, cx1) {
+      const pts = [];
+      if (first && cx0 > 0) pts.push([0, yc0], [cx0, yc0], [cx0, yc1]); else pts.push([a, yc1]);
+      if (last && cx1 < L) pts.push([cx1, yc1], [cx1, yc0], [L, yc0], [L, D]); else pts.push([b, yc1], [b, D]);
+      pts.push([a, D]);
+      return pts;
     }
 
-    // Unit lines — split the right (frontage) face into `units` equal bays per floor.
-    // This face runs along Y (0..D) horizontally on screen, so the dividers vary Y, not X.
-    for (let u = 1; u < units; u++) {
-      const y = (D / units) * u;
-      const a = track(P(W,y,0)), b = track(P(W,y,heightFt));
-      svgParts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#b9b9b9" stroke-width="0.8"/>`);
+    let north = [], south = [];
+    if (p.stairs === 1) {
+      const coreW = shaftW + (p.elevator ? elevW : 0);
+      const c = stairCore(L / 2 - coreW / 2, p.elevator);
+      cores.push(c);
+      if (N <= 2) {
+        corr = { x0: c.x0, x1: c.x1, y0: yc0, y1: D };
+        north.push({ poly: rectPoly(0, c.x0, 0, D), lab: [0, c.x0, 0, D], door: { x: c.x0, y: ym, dir: 'W' } });
+        north.push({ poly: rectPoly(c.x1, L, 0, D), lab: [c.x1, L, 0, D], door: { x: c.x1, y: ym, dir: 'E' } });
+        southBays = [[0, c.x0], [c.x1, L]];
+      } else {
+        const nps = Math.max(1, Math.floor(N / 4));
+        const ns = N - 2 * nps;
+        const nl = split(0, c.x0, nps), nr = split(c.x1, L, nps), sb = split(0, L, ns);
+        let cx0 = Math.min(sb[0][1], nl[0][1]) - 1.4;
+        let cx1 = Math.max(sb[ns - 1][0], nr[nps - 1][0]) + 1.4;
+        cx0 = Math.min(cx0, c.doorX - 1.0);
+        cx1 = Math.max(cx1, c.doorX + 1.0);
+        if (cx0 < 1) cx0 = 0;
+        if (cx1 > L - 1) cx1 = L;
+        corr = { x0: cx0, x1: cx1, y0: yc0, y1: yc1 };
+        nl.concat(nr).forEach(([a, b]) => north.push({ poly: rectPoly(a, b, 0, yc0), lab: [a, b, 0, yc0], door: { x: doorCentre(a, b, cx0, cx1), y: yc0, dir: 'N' } }));
+        sb.forEach(([a, b], i) => south.push({ poly: southPoly(a, b, i === 0, i === ns - 1, cx0, cx1), lab: [a, b, yc1, D], door: { x: doorCentre(a, b, cx0, cx1), y: yc1, dir: 'S' } }));
+        southBays = sb;
+      }
+    } else {
+      const s1 = stairCore(0, false), s2 = stairCore(L - shaftW, false);
+      cores.push(s1, s2);
+      const obst = [[s1.x0, s1.x1], [s2.x0, s2.x1]];
+      if (p.elevator) { const e = elevCore(L / 2); cores.push(e); obst.push([e.x0, e.x1]); }
+      obst.sort((a, b) => a[0] - b[0]);
+      const spans = [];
+      let cur = 0;
+      obst.forEach(([a, b]) => { if (a - cur > 0.5) spans.push([cur, a]); cur = Math.max(cur, b); });
+      if (L - cur > 0.5) spans.push([cur, L]);
+      corr = { x0: 0, x1: L, y0: yc0, y1: yc1 };
+      const nn = Math.floor(N / 2), ns = N - nn;
+      const alloc = allocate(nn, spans);
+      spans.forEach((s, i) => {
+        if (alloc[i] > 0) split(s[0], s[1], alloc[i]).forEach(([a, b]) => north.push({ poly: rectPoly(a, b, 0, yc0), lab: [a, b, 0, yc0], door: { x: (a + b) / 2, y: yc0, dir: 'N' } }));
+        else north.push({ poly: rectPoly(s[0], s[1], 0, yc0), lab: null, door: null, common: true });
+      });
+      const sb = split(0, L, ns);
+      sb.forEach(([a, b]) => south.push({ poly: rectPoly(a, b, yc1, D), lab: [a, b, yc1, D], door: { x: (a + b) / 2, y: yc1, dir: 'S' } }));
+      southBays = sb;
     }
 
-    // Stair core — a flush block set within the mass on the LEFT face (not the frontage face),
-    // so the unit lines on the right stay visible and uncovered.
-    const coreWidth = W * 0.36;
-    const cx0 = (W - coreWidth) / 2;
-    const cy = D;
+    // Number clockwise from the top left
+    north.sort((a, b) => a.poly[0][0] - b.poly[0][0]);
+    south.sort((a, b) => b.lab[0] - a.lab[0]);
+    let n = 1;
+    north.concat(south).forEach(u => { if (!u.common) { u.num = n++; } units.push(u); });
 
-    const coreFront = trackAll([P(cx0,cy,0), P(cx0+coreWidth,cy,0), P(cx0+coreWidth,cy,heightFt), P(cx0,cy,heightFt)]);
-    svgParts.push(`<polygon points="${poly(coreFront)}" fill="#d9722c" stroke="#1a1a1a" stroke-width="1.6"/>`);
+    return { L, D, cw, rd, yc0, yc1, ym, cores, units, corr, southBays, shaftW, vd, special: p.stairs === 1 && N <= 2 };
+  }
 
-    // Floor divisions within the core
-    for (let i = 1; i < stories; i++) {
-      const z = i * floorH;
-      const a = P(cx0,cy,z), b = P(cx0+coreWidth,cy,z);
-      svgParts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#8a4315" stroke-width="0.9"/>`);
+  /* ---------------- isometric scene ---------------- */
+  function isoScene(p, lay) {
+    const k = 1000 / p.isoScale;                       // mm on paper per metre
+    const P = (x, y, z) => [(x - y) * C30 * k, ((x + y) / 2 - z) * k];
+    const { L, D, rd, yc0, yc1 } = lay;
+    const fh = p.fh, H = p.storeys * fh;
+    const c = makeCanvas();
+    const acc = p.accent;
+    const SW = 0.18;
+
+    function box(x0, x1, y0, y1, z0, z1, cTop, cY, cX, sw = SW) {
+      c.poly([P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1)], cTop, INK, sw);
+      c.poly([P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1)], cY, INK, sw);
+      c.poly([P(x1, y0, z0), P(x1, y1, z0), P(x1, y1, z1), P(x1, y0, z1)], cX, INK, sw);
+    }
+    function tree(x, y, r) {
+      const base = P(x, y, 0), crown = P(x, y, 2.3 + r * 0.85);
+      c.raw(`<ellipse cx="${r2(base[0] + r * 0.6 * k)}" cy="${r2(base[1] - r * 0.15 * k)}" rx="${r2(r * 1.1 * k)}" ry="${r2(r * 0.5 * k)}" fill="rgba(37,48,58,0.08)"/>`);
+      c.line(base, P(x, y, 2.4), '#7A6A58', 0.32);
+      c.circle(crown, r * k, '#C5D3BA', '#8DA27E', 0.15);
+      c.circle([crown[0] - r * 0.3 * k, crown[1] - r * 0.3 * k], r * 0.42 * k, '#D7E2CD', null, 0);
     }
 
-    // Continuous switchback stair path — one unbroken zigzag from ground to roof, one chevron per floor
-    const xA = cx0 + coreWidth * 0.16;
-    const xB = cx0 + coreWidth * 0.84;
-    const halfStep = floorH / 2;
-    const zigPts = [];
-    for (let k = 0; k <= stories * 2; k++) {
-      const z = k * halfStep;
-      const x = (k % 2 === 0) ? xA : xB;
-      zigPts.push(P(x, cy, z));
+    // context: ground, shadow, trees
+    if (p.context) {
+      const g = 4;
+      c.poly([P(-g, -g, 0), P(L + g, -g, 0), P(L + g, D + g, 0), P(-g, D + g, 0)], '#EDF0EA');
+      const vx = H * 0.5, vy = -H * 0.22;
+      c.poly([P(0, 0, 0), P(vx, vy, 0), P(L + vx, vy, 0), P(L + vx, D + vy, 0), P(L, D, 0), P(0, D, 0)], 'rgba(37,48,58,0.09)');
+      tree(L + 4, -8, 3.4);
+      tree(L + 10, -2, 2.7);
     }
-    svgParts.push(`<polyline points="${poly(zigPts)}" fill="none" stroke="#f5c518" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`);
 
-    // ---------- Dimension line: to the LEFT, anchored to the left face's own top-left and bottom-left corners ----------
-    const topCorner = P(0, D, heightFt);       // top-left corner of the left face
-    const bottomCorner = P(0, D, 0);           // bottom-left corner of the left face
-    const dimX = Math.min(...allX) - 46;
+    const topF = [P(0, 0, H), P(L, 0, H), P(L, D, H), P(0, D, H)];
+    const longF = [P(0, D, 0), P(L, D, 0), P(L, D, H), P(0, D, H)];
+    const endF = [P(L, 0, 0), P(L, D, 0), P(L, D, H), P(L, 0, H)];
 
-    const dimTop = track([dimX, topCorner[1]]);
-    const dimBase = track([dimX, bottomCorner[1]]);
-
-    // horizontal extension lines connecting the dimension to the actual roof/ground points
-    svgParts.push(`<line x1="${dimTop[0]}" y1="${dimTop[1]}" x2="${topCorner[0]}" y2="${topCorner[1]}" stroke="#999" stroke-width="0.7" stroke-dasharray="2,2"/>`);
-    svgParts.push(`<line x1="${dimBase[0]}" y1="${dimBase[1]}" x2="${bottomCorner[0]}" y2="${bottomCorner[1]}" stroke="#999" stroke-width="0.7" stroke-dasharray="2,2"/>`);
-
-    // dimension line itself
-    svgParts.push(`<line x1="${dimTop[0]}" y1="${dimTop[1]}" x2="${dimBase[0]}" y2="${dimBase[1]}" stroke="#1a1a1a" stroke-width="1.2"/>`);
-    // tick marks (small diagonal hatch at each end)
-    [dimTop, dimBase].forEach(pt => {
-      svgParts.push(`<line x1="${pt[0]-6}" y1="${pt[1]+5}" x2="${pt[0]+6}" y2="${pt[1]-5}" stroke="#1a1a1a" stroke-width="1.4"/>`);
+    // overrun volumes above the roof
+    const overruns = [];
+    if (p.overrun) {
+      lay.cores.forEach(core => {
+        if (core.stair) overruns.push({ x0: core.stair.x0, x1: core.stair.x1, y0: 0, y1: rd, h: 3.0, kind: 'stair' });
+        if (core.elev) overruns.push({ x0: core.elev.x0, x1: core.elev.x1, y0: core.elev.y0, y1: core.elev.y1, h: 1.6, kind: 'elev' });
+      });
+      overruns.sort((a, b) => (a.x0 + a.y0) - (b.x0 + b.y0));
+    }
+    const drawOverruns = () => overruns.forEach(o => {
+      if (o.kind === 'stair') box(o.x0, o.x1, o.y0, o.y1, H, H + o.h, mix(acc, '#ffffff', 0.3), acc, mix(acc, '#000000', 0.18));
+      else box(o.x0, o.x1, o.y0, o.y1, H, H + o.h, '#EEF0F2', '#D9DEE2', '#C2CAD0');
     });
 
-    const midY = (dimTop[1] + dimBase[1]) / 2;
-    const labelX = dimX - 10;
-    track([labelX - 60, midY]); // reserve room for the text so it isn't cropped
-    const dimMode = getDimMode();
-    const dimLabel = dimMode === 'storeys'
-      ? `${stories} storey${stories === 1 ? '' : 's'}`
-      : formatMetres(heightFt);
-    svgParts.push(`<text x="${labelX}" y="${midY + 5}" font-size="14" font-weight="700" fill="#1a1a1a" text-anchor="end">${dimLabel}</text>`);
-
-    svg.innerHTML = svgParts.join('\n');
-
-    // Fit the viewBox exactly to whatever was drawn, with padding — never crops regardless of storeys/height
-    const pad = 16;
-    const minX = Math.min(...allX) - pad;
-    const maxX = Math.max(...allX) + pad;
-    const minY = Math.min(...allY) - pad;
-    const maxY = Math.max(...allY) + pad;
-    svg.setAttribute('viewBox', `${minX} ${minY} ${maxX - minX} ${maxY - minY}`);
-  }
-
-  function createNoteLi(text) {
-    const li = document.createElement('li');
-    li.className = 'note-item';
-
-    const span = document.createElement('span');
-    span.className = 'note-text';
-    span.contentEditable = 'true';
-    span.textContent = text;
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'note-remove';
-    btn.setAttribute('aria-label', 'Remove note');
-    btn.textContent = '\u00d7';
-    btn.addEventListener('click', () => li.remove());
-
-    li.appendChild(span);
-    li.appendChild(btn);
-    return li;
-  }
-
-  function syncNotes() {
-    const stories = parseInt(storiesInput.value, 10) || 1;
-    const units = parseInt(unitsInput.value, 10) || 0;
-    const occ = parseInt(occInput.value, 10) || 0;
-    notesList.innerHTML = '';
-    notesList.appendChild(createNoteLi(`Up to ${stories} storey${stories === 1 ? '' : 's'}`));
-    notesList.appendChild(createNoteLi(`${occ} occupant${occ === 1 ? '' : 's'} per floor`));
-    notesList.appendChild(createNoteLi(`${units} unit${units === 1 ? '' : 's'} per floor`));
-  }
-
-  storiesInput.addEventListener('input', () => {
-    const stories = parseInt(storiesInput.value, 10);
-    if (stories && stories !== lastStories) {
-      heightInput.value = stories * 3;
-      lastStories = stories;
+    if (p.isoStyle === 'xray') {
+      const dash = 'stroke-dasharray="0.9 0.7"';
+      c.line(P(0, 0, 0), P(L, 0, 0), '#9AA5AF', 0.15, dash);
+      c.line(P(0, 0, 0), P(0, D, 0), '#9AA5AF', 0.15, dash);
+      c.line(P(0, 0, 0), P(0, 0, H), '#9AA5AF', 0.15, dash);
+      for (let i = 0; i < p.storeys; i++) {
+        const z = i * fh;
+        c.poly([P(0, 0, z), P(L, 0, z), P(L, D, z), P(0, D, z)], i === 0 ? 'rgba(37,48,58,0.04)' : 'none', '#C1C9D0', 0.12);
+      }
+      const vols = [];
+      lay.cores.forEach(core => {
+        if (core.stair) vols.push({ x0: core.stair.x0, x1: core.stair.x1, y0: 0, y1: rd, kind: 'stair' });
+        if (core.elev) vols.push({ x0: core.elev.x0, x1: core.elev.x1, y0: core.elev.y0, y1: core.elev.y1, kind: 'elev' });
+      });
+      vols.sort((a, b) => (a.x0 + a.y0) - (b.x0 + b.y0));
+      vols.forEach(v => {
+        const st = v.kind === 'stair';
+        const cT = st ? mix(acc, '#ffffff', 0.3) : '#EEF0F2', cY = st ? acc : '#D9DEE2', cX = st ? mix(acc, '#000000', 0.18) : '#C2CAD0';
+        box(v.x0, v.x1, v.y0, v.y1, 0, H, cT, cY, cX);
+        const lc = st ? mix(acc, '#000000', 0.35) : '#A9B2BA';
+        for (let i = 1; i < p.storeys; i++) {
+          const z = i * fh;
+          c.line(P(v.x0, v.y1, z), P(v.x1, v.y1, z), lc, 0.12);
+          c.line(P(v.x1, v.y1, z), P(v.x1, v.y0, z), lc, 0.12);
+        }
+        if (st) {
+          const w = v.x1 - v.x0, xa = v.x0 + w * 0.2, xb = v.x1 - w * 0.2;
+          const zig = [];
+          for (let s = 0; s <= p.storeys * 2; s++) zig.push(P(s % 2 ? xb : xa, rd, s * fh / 2));
+          c.pl(zig, mix(acc, '#ffffff', 0.78), 0.35);
+        }
+      });
+      c.poly(longF, 'rgba(255,255,255,0.38)', INK, 0.25);
+      c.poly(endF, 'rgba(226,231,235,0.42)', INK, 0.25);
+      c.poly(topF, 'rgba(255,255,255,0.30)', INK, 0.25);
+      for (let i = 1; i < p.storeys; i++) {
+        const z = i * fh;
+        c.line(P(0, D, z), P(L, D, z), '#AAB4BC', 0.12);
+        c.line(P(L, D, z), P(L, 0, z), '#AAB4BC', 0.12);
+      }
+      drawOverruns();
+    } else {
+      c.poly(longF, '#FFFFFF', INK, 0.25);
+      c.poly(endF, '#D7DCE1', INK, 0.25);
+      c.poly(topF, '#F1F3F4', INK, 0.25);
+      for (let i = 1; i < p.storeys; i++) {
+        const z = i * fh;
+        c.line(P(0, D, z), P(L, D, z), '#C3CBD1', 0.12);
+        c.line(P(L, D, z), P(L, 0, z), '#AAB3BB', 0.12);
+      }
+      // windows on the long face
+      const winY = (x0, x1, z0, z1, fill) => c.poly([P(x0, D, z0), P(x1, D, z0), P(x1, D, z1), P(x0, D, z1)], fill);
+      const winX = (y0, y1, z0, z1, fill) => c.poly([P(L, y0, z0), P(L, y1, z0), P(L, y1, z1), P(L, y0, z1)], fill);
+      const entryX = L / 2;
+      for (let i = 0; i < p.storeys; i++) {
+        const z = i * fh;
+        lay.southBays.forEach(([a, b]) => {
+          const n = Math.max(1, Math.round((b - a) / 3.6));
+          for (let j = 0; j < n; j++) {
+            const cx = a + (j + 0.5) * (b - a) / n;
+            if (i === 0 && Math.abs(cx - entryX) < 2.2) continue;
+            if (p.balconies && i > 0 && j === Math.floor(n / 2)) winY(cx - 0.8, cx + 0.8, z + 0.05, z + 2.3, '#9DB0BF');
+            else winY(cx - 0.65, cx + 0.65, z + 0.9, z + 2.4, '#A9BBC8');
+          }
+        });
+        [[0, yc0], [yc1, D]].forEach(([a, b]) => {
+          const n = Math.max(1, Math.round((b - a) / 4.2));
+          for (let j = 0; j < n; j++) {
+            const cy = a + (j + 0.5) * (b - a) / n;
+            winX(cy - 0.6, cy + 0.6, z + 0.9, z + 2.4, '#8EA2B2');
+          }
+        });
+      }
+      winY(entryX - 0.9, entryX + 0.9, 0, 2.4, '#3D4A55');
+      // parapet line
+      const ins = 0.35;
+      c.poly([P(ins, ins, H), P(L - ins, ins, H), P(L - ins, D - ins, H), P(ins, D - ins, H)], 'none', '#C6CDD3', 0.12);
+      drawOverruns();
+      // balconies
+      if (p.balconies && p.storeys > 1) {
+        const list = [];
+        lay.southBays.forEach(([a, b]) => {
+          const bw = Math.min(3.2, (b - a) - 0.6);
+          if (bw < 1.2) return;
+          const cx = (a + b) / 2;
+          for (let i = 1; i < p.storeys; i++) list.push({ x0: cx - bw / 2, x1: cx + bw / 2, z: i * fh });
+        });
+        list.sort((m, n) => (m.x1 - n.x1) || (m.z - n.z));
+        const bt = mix(p.balc, '#ffffff', 0.35), bs = mix(p.balc, '#000000', 0.15);
+        list.forEach(b => box(b.x0, b.x1, D, D + 1.4, b.z - 0.2, b.z + 1.05, bt, p.balc, bs, 0.15));
+      }
     }
+
+    // dimensions
+    if (p.isoDims) {
+      const tk = 0.75;
+      const tick = q => c.line([q[0] - tk, q[1] + tk], [q[0] + tk, q[1] - tk], INK, 0.3);
+      const ext = '#8C969F';
+      // height, to the left of the long face
+      const a = P(0, D, H), b = P(0, D, 0), xd = b[0] - 6;
+      c.line([a[0] - 1, a[1]], [xd - 1.2, a[1]], ext, 0.12);
+      c.line([b[0] - 1, b[1]], [xd - 1.2, b[1]], ext, 0.12);
+      c.line([xd, a[1]], [xd, b[1]], INK, 0.18);
+      tick([xd, a[1]]); tick([xd, b[1]]);
+      const mid = (a[1] + b[1]) / 2;
+      const storeysTxt = `${p.storeys} storey${p.storeys === 1 ? '' : 's'}`;
+      if (p.hlabel === 'both') {
+        c.text(xd - 1.8, mid - 0.4, 2.6, fmtM(H), { anchor: 'end', weight: 600 });
+        c.text(xd - 1.8, mid + 2.6, 2.1, storeysTxt, { anchor: 'end', fill: '#5B6772' });
+      } else {
+        c.text(xd - 1.8, mid + 0.9, 2.6, p.hlabel === 'storeys' ? storeysTxt : fmtM(H), { anchor: 'end', weight: 600 });
+      }
+      // length, along the long face
+      const g = 5 / k;
+      const la = P(0, D + g, 0), lb = P(L, D + g, 0);
+      c.line(P(0, D + 0.8 / k, 0), P(0, D + g + 1.2 / k, 0), ext, 0.12);
+      c.line(P(L, D + 0.8 / k, 0), P(L, D + g + 1.2 / k, 0), ext, 0.12);
+      c.line(la, lb, INK, 0.18); tick(la); tick(lb);
+      const lm = [(la[0] + lb[0]) / 2 - 0.866 * 3.2, (la[1] + lb[1]) / 2 + 0.5 * 3.2];
+      c.text(lm[0], lm[1] + 0.8, 2.4, fmtM(L), { anchor: 'middle', rot: 30 });
+      // depth, along the end face
+      const da = P(L + g, 0, 0), db = P(L + g, D, 0);
+      c.line(P(L + 0.8 / k, 0, 0), P(L + g + 1.2 / k, 0, 0), ext, 0.12);
+      c.line(P(L + 0.8 / k, D, 0), P(L + g + 1.2 / k, D, 0), ext, 0.12);
+      c.line(da, db, INK, 0.18); tick(da); tick(db);
+      const dm = [(da[0] + db[0]) / 2 + 0.866 * 3.2, (da[1] + db[1]) / 2 + 0.5 * 3.2];
+      c.text(dm[0], dm[1] + 0.8, 2.4, fmtM(D), { anchor: 'middle', rot: -30 });
+    }
+
+    return { els: c.els, bb: c.bb, anchor: P(L, D, 0), defs: '' };
+  }
+
+  /* ---------------- floor plan scene ---------------- */
+  function planScene(p, lay, pre) {
+    const k = 1000 / p.planScale;
+    const Q = (x, y) => [x * k, y * k];
+    const R = (x0, x1, y0, y1) => [Q(x0, y0), Q(x1, y0), Q(x1, y1), Q(x0, y1)];
+    const { L, D, rd, ym, corr } = lay;
+    const c = makeCanvas();
+    const acc = p.accent;
+    const RED = '#C8352E';
+    const wall = 0.2;
+
+    const defs = `<pattern id="${pre}hatch" width="1.1" height="1.1" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="1.1" height="1.1" fill="#F2F4F5"/><line x1="0" y1="0" x2="0" y2="1.1" stroke="#B4BDC5" stroke-width="0.16"/></pattern>`;
+
+    // suites
+    lay.units.forEach(u => c.poly(u.poly.map(q => Q(q[0], q[1])), u.common ? `url(#${pre}hatch)` : '#FFFFFF', INK, wall));
+    // corridor
+    c.poly(R(corr.x0, corr.x1, corr.y0, corr.y1), p.circ, INK, wall);
+
+    // cores
+    lay.cores.forEach(core => {
+      c.poly(R(core.x0, core.x1, core.y0, core.y1), '#FFFFFF', INK, wall);
+      if (core.svc && core.svc.y1 - core.svc.y0 > 0.05) c.poly(R(core.svc.x0, core.svc.x1, core.svc.y0, core.svc.y1), `url(#${pre}hatch)`, INK, wall);
+      if (core.vest) c.poly(R(core.vest.x0, core.vest.x1, core.vest.y0, core.vest.y1), mix(acc, '#ffffff', 0.9), acc, 0.25);
+      if (core.elev) {
+        const e = core.elev;
+        c.poly(R(e.x0, e.x1, e.y0, e.y1), '#E4E8EB', INK, wall);
+        const i = 0.35;
+        c.line(Q(e.x0 + i, e.y0 + i), Q(e.x1 - i, e.y1 - i), '#9AA5AF', 0.12);
+        c.line(Q(e.x1 - i, e.y0 + i), Q(e.x0 + i, e.y1 - i), '#9AA5AF', 0.12);
+      }
+      if (core.stair) drawStair(core.stair);
+    });
+
+    function drawStair(s) {
+      c.poly(R(s.x0, s.x1, s.y0, s.y1), mix(acc, '#ffffff', 0.84), acc, 0.32);
+      const fw = p.flight, gap = 0.08, mx = (s.x0 + s.x1) / 2;
+      const ax0 = s.x0 + gap, ax1 = Math.min(s.x0 + gap + fw, mx - 0.05);
+      const bx0 = Math.max(s.x1 - gap - fw, mx + 0.05), bx1 = s.x1 - gap;
+      const h = s.y1 - s.y0;
+      const land = Math.min(Math.max(fw, 1.1), h * 0.3);
+      const ry0 = s.y0 + land, ry1 = s.y1 - land;
+      if (ry1 - ry0 < 0.6) return;
+      const step = 0.28 * Math.max(1, Math.ceil(0.55 / (0.28 * k)));
+      const tc = mix(acc, '#000000', 0.12);
+      for (let y = ry0; y <= ry1 + 1e-6; y += step) {
+        c.line(Q(ax0, y), Q(ax1, y), tc, 0.1);
+        c.line(Q(bx0, y), Q(bx1, y), tc, 0.1);
+      }
+      c.line(Q(mx, ry0), Q(mx, ry1), acc, 0.22);
+      const ax = (ax0 + ax1) / 2, tip = Q(ax, ry0 + 0.15);
+      c.pl([Q(ax, ry1 + land * 0.45), tip], acc, 0.22);
+      const ah = Math.min(0.9, fw * 0.4) * k;
+      c.pl([[tip[0] - ah * 0.6, tip[1] + ah], tip, [tip[0] + ah * 0.6, tip[1] + ah]], acc, 0.22);
+    }
+
+    // envelope
+    c.poly(R(0, L, 0, D), 'none', INK, 0.55);
+
+    // doors
+    function door(x, y, dir, w, col) {
+      const hor = dir === 'N' || dir === 'S';
+      const a = hor ? Q(x - w / 2, y) : Q(x, y - w / 2);
+      const b = hor ? Q(x + w / 2, y) : Q(x, y + w / 2);
+      c.line(a, b, '#FFFFFF', 0.55);
+      if (!p.planDoors) return;
+      const hinge = hor ? [x - w / 2, y] : [x, y - w / 2];
+      const leaf = dir === 'N' ? [x - w / 2, y - w] : dir === 'S' ? [x - w / 2, y + w] : dir === 'W' ? [x - w, y - w / 2] : [x + w, y - w / 2];
+      const shut = hor ? [x + w / 2, y] : [x, y + w / 2];
+      c.line(Q(...hinge), Q(...leaf), col, 0.18);
+      let a0 = Math.atan2(leaf[1] - hinge[1], leaf[0] - hinge[0]);
+      let a1 = Math.atan2(shut[1] - hinge[1], shut[0] - hinge[0]);
+      let d = a1 - a0;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      const arc = [];
+      for (let i = 0; i <= 12; i++) { const t = a0 + d * i / 12; arc.push(Q(hinge[0] + Math.cos(t) * w, hinge[1] + Math.sin(t) * w)); }
+      c.pl(arc, col, 0.1);
+    }
+    lay.units.forEach(u => { if (u.door) door(u.door.x, u.door.y, u.door.dir, 0.9, INK); });
+    lay.cores.forEach(core => {
+      if (core.stair) {
+        if (core.vest) {
+          door(core.doorX, rd, 'N', 1.0, acc);
+          door(core.stairDoorX, rd - lay.vd, 'N', 1.0, acc);
+        } else door(core.stairDoorX, rd, 'N', 1.0, acc);
+      }
+      if (core.elev && core.elev.y1 >= rd - 0.01) {
+        const e = core.elev, ex = (e.x0 + e.x1) / 2;
+        c.line(Q(ex - 0.5, rd), Q(ex + 0.5, rd), '#FFFFFF', 0.55);
+      }
+    });
+
+    // where each suite's travel line runs (used for the line itself and to keep labels clear of it)
+    function farthest(u) {
+      const d = [u.door.x, u.door.y];
+      let far = null, fd = -1;
+      u.poly.forEach(v => { const dd = Math.hypot(v[0] - d[0], v[1] - d[1]); if (dd > fd) { fd = dd; far = v; } });
+      const ux = (far[0] - d[0]) / fd, uy = (far[1] - d[1]) / fd;
+      return { d, end: [far[0] - ux * 0.35, far[1] - uy * 0.35], fd };
+    }
+    function segHitsRect(a, b, r) {
+      // Liang-Barsky clip of segment a-b against rect r = [x0, y0, x1, y1]
+      let t0 = 0, t1 = 1;
+      const dx = b[0] - a[0], dy = b[1] - a[1];
+      const checks = [[-dx, a[0] - r[0]], [dx, r[2] - a[0]], [-dy, a[1] - r[1]], [dy, r[3] - a[1]]];
+      for (const [pp, q] of checks) {
+        if (pp === 0) { if (q < 0) return false; continue; }
+        const t = q / pp;
+        if (pp < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+        else { if (t < t0) return false; if (t < t1) t1 = t; }
+      }
+      return true;
+    }
+
+    // unit labels
+    if (p.planLabels) {
+      lay.units.forEach(u => {
+        if (!u.lab) return;
+        const [a, b, y0, y1] = u.lab;
+        const w = (b - a) * k, size = 2.1;
+        let txt = `Unit ${u.num}`;
+        if (textW(txt, size) > w * 0.8) txt = String(u.num);
+        let cy = (y0 + y1) / 2;
+        if (u.door && (u.door.dir === 'N' || u.door.dir === 'S')) cy = y0 + (y1 - y0) * (u.door.dir === 'N' ? 0.42 : 0.58);
+        let X = ((a + b) / 2) * k, Y = cy * k + size * 0.35;
+        if (p.planTravel && u.door) {
+          const t = farthest(u), A = Q(...t.d), B = Q(...t.end);
+          const M = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2], mr = textW(fmtM(t.fd), 1.9) / 2 + 0.8;
+          const hitsMid = r => { const nx = clamp(M[0], r[0], r[2]), ny = clamp(M[1], r[1], r[3]); return Math.hypot(nx - M[0], ny - M[1]) < mr; };
+          const inner = [a * k + 0.5, y0 * k + 0.5, b * k - 0.5, y1 * k - 0.5];
+          const fits = r => r[0] >= inner[0] && r[2] <= inner[2] && r[1] >= inner[1] && r[3] <= inner[3];
+          const place = str => {
+            const w2 = textW(str, size) / 2 + 0.6;
+            const box = (x, y) => [x - w2, y - size * 0.9, x + w2, y + size * 0.35];
+            let best = null, bd = Infinity;
+            for (let x = inner[0] + w2; x <= inner[2] - w2 + 1e-6; x += 0.4) {
+              for (let y = inner[1] + size * 0.9; y <= inner[3] - size * 0.35 + 1e-6; y += 0.4) {
+                const r = box(x, y);
+                if (!fits(r) || segHitsRect(A, B, r) || hitsMid(r)) continue;
+                const d = Math.hypot(x - X, (y - Y) * 1.3);
+                if (d < bd) { bd = d; best = [x, y]; }
+              }
+            }
+            return best;
+          };
+          let spot = place(txt);
+          if (!spot && txt !== String(u.num)) { txt = String(u.num); spot = place(txt); }
+          if (spot) { X = spot[0]; Y = spot[1]; }
+        }
+        c.text(X, Y, size, txt, { anchor: 'middle', fill: '#3A4651' });
+      });
+    }
+
+    // travel distances
+    if (p.planTravel) {
+      const lab = (a, b, txt) => {
+        const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
+        const size = 1.9;
+        if (len < textW(txt, size) + 2) return;
+        let ang = Math.atan2(dy, dx) * 180 / Math.PI;
+        if (ang > 90) ang -= 180;
+        if (ang < -90) ang += 180;
+        const rad = ang * Math.PI / 180;
+        const mx = (a[0] + b[0]) / 2 + Math.sin(rad) * 0.7, my = (a[1] + b[1]) / 2 - Math.cos(rad) * 0.7;
+        c.text(mx, my, size, txt, { anchor: 'middle', rot: ang, fill: RED, halo: true, weight: 600 });
+      };
+      lay.units.forEach(u => {
+        if (!u.door) return;
+        const { d, end, fd } = farthest(u);
+        const A = Q(d[0], d[1]), B = Q(end[0], end[1]);
+        c.line(A, B, RED, 0.2);
+        c.circle(B, 0.35, RED);
+        lab(A, B, fmtM(fd));
+      });
+      const stairs = lay.cores.filter(co => co.stair).map(co => co.doorX);
+      const doors = lay.units.filter(u => u.door && (u.door.dir === 'N' || u.door.dir === 'S')).map(u => u.door.x);
+      const run = (x0, x1) => {
+        const d = Math.abs(x1 - x0);
+        if (d < 0.3) return;
+        const A = Q(x0, ym), B = Q(x1, ym);
+        c.line(A, B, RED, 0.28);
+        c.circle(A, 0.4, RED); c.circle(B, 0.4, RED);
+        const size = 1.9, txt = fmtM(d);
+        if (Math.abs(B[0] - A[0]) > textW(txt, size) + 1) c.text((A[0] + B[0]) / 2, A[1] + size * 0.36, size, txt, { anchor: 'middle', fill: RED, halo: true, weight: 600 });
+      };
+      if (doors.length && stairs.length && !lay.special) {
+        if (stairs.length === 1) {
+          const t = stairs[0];
+          const left = doors.filter(x => x < t), right = doors.filter(x => x > t);
+          if (left.length) run(Math.min(...left), t);
+          if (right.length) run(t, Math.max(...right));
+        } else {
+          let best = null, bd = -1;
+          doors.forEach(x => {
+            const near = stairs.reduce((m, s) => Math.abs(s - x) < Math.abs(m - x) ? s : m, stairs[0]);
+            const dd = Math.abs(near - x);
+            if (dd > bd) { bd = dd; best = [x, near]; }
+          });
+          if (best) run(Math.min(...best), Math.max(...best));
+        }
+      }
+    }
+
+    // dimensions
+    if (p.planDims) {
+      const W = L * k, Hh = D * k, g = 5, tk = 0.75;
+      const tick = q => c.line([q[0] - tk, q[1] + tk], [q[0] + tk, q[1] - tk], INK, 0.3);
+      const ext = '#8C969F';
+      c.line([0, -1], [0, -g - 1.2], ext, 0.12); c.line([W, -1], [W, -g - 1.2], ext, 0.12);
+      c.line([0, -g], [W, -g], INK, 0.18); tick([0, -g]); tick([W, -g]);
+      c.text(W / 2, -g - 1.3, 2.4, fmtM(L), { anchor: 'middle' });
+      c.line([-1, 0], [-g - 1.2, 0], ext, 0.12); c.line([-1, Hh], [-g - 1.2, Hh], ext, 0.12);
+      c.line([-g, 0], [-g, Hh], INK, 0.18); tick([-g, 0]); tick([-g, Hh]);
+      c.text(-g - 1.3, Hh / 2, 2.4, fmtM(D), { anchor: 'middle', rot: -90 });
+    }
+
+    // scale bar
+    if (p.planBar) {
+      const nice = [1, 2, 5, 10, 20, 25, 50, 100, 200];
+      let T = nice[0];
+      for (const n of nice) { if (n * k <= 32) T = n; }
+      const y = D * k + 5, w = T * k, h = 0.9;
+      c.poly([[0, y], [w / 2, y], [w / 2, y + h], [0, y + h]], INK, INK, 0.15);
+      c.poly([[w / 2, y], [w, y], [w, y + h], [w / 2, y + h]], '#FFFFFF', INK, 0.15);
+      c.text(0, y + h + 2.6, 1.9, '0', { anchor: 'middle', fill: '#4A5560' });
+      c.text(w / 2, y + h + 2.6, 1.9, fmtN(T / 2), { anchor: 'middle', fill: '#4A5560' });
+      c.text(w, y + h + 2.6, 1.9, `${fmtN(T)}\u202Fm`, { anchor: 'middle', fill: '#4A5560' });
+    }
+
+    return { els: c.els, bb: c.bb, anchor: [0, 0], defs };
+  }
+
+  /* ---------------- captions and composition ---------------- */
+  function autoTitle(p) { return p.stairs === 1 ? `Single exit stair, ${p.storeys} storeys` : `Two exit stairs, ${p.storeys} storeys`; }
+  function autoNotes(p) {
+    const H = p.storeys * p.fh;
+    const out = [];
+    out.push(`${p.storeys} storey${p.storeys === 1 ? '' : 's'}, ${fmtN(H)} m to roof`);
+    out.push(`${p.units} units per storey${p.occ ? `, ${p.occ} occupants per storey` : ''}`);
+    out.push(`${fmtN(p.L)} × ${fmtN(p.D)} m, ${Math.round(p.L * p.D).toLocaleString('en-CA')} m² per storey`);
+    return out;
+  }
+  function wrap(text, size, maxW) {
+    const words = String(text).split(/\s+/);
+    const lines = [];
+    let cur = '';
+    words.forEach(w => {
+      const t = cur ? cur + ' ' + w : w;
+      if (textW(t, size) > maxW && cur) { lines.push(cur); cur = w; } else cur = t;
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  }
+
+  function compose(scene, maxScene, kind, p) {
+    const m = 4;
+    let warn = false, CB = scene.bb, tx, ty;
+    if (maxScene) {
+      const MB = maxScene.bb;
+      ty = kind === 'iso' ? m + (maxScene.anchor[1] - MB.y0) - scene.anchor[1] : m + (MB.h - scene.bb.h) / 2 - scene.bb.y0;
+      tx = m + (MB.w - scene.bb.w) / 2 - scene.bb.x0;
+      const top = scene.bb.y0 + ty, bot = scene.bb.y1 + ty;
+      if (scene.bb.w > MB.w + 0.01 || top < m - 0.01 || bot > m + MB.h + 0.01) warn = true;
+      else CB = MB;
+    }
+    if (!maxScene || warn) { CB = scene.bb; tx = m - CB.x0; ty = m - CB.y0; }
+
+    const W = CB.w + 2 * m;
+    const lines = [];
+    if (p.caption) {
+      const maxW = W - 2 * m;
+      wrap(p.title || autoTitle(p), 3.0, maxW).forEach(t => lines.push({ t, size: 3.0, weight: 600, fill: INK }));
+      const notes = p.notes.trim() ? p.notes.split('\n').map(s => s.trim()).filter(Boolean) : autoNotes(p);
+      notes.forEach(n => wrap(n, 2.3, maxW).forEach(t => lines.push({ t, size: 2.3, fill: '#46525D' })));
+    }
+    if (p.scaleNote) {
+      const s = kind === 'iso' ? `Isometric, 1:${fmtN(p.isoScale)} along the building axes` : `Floor plan, 1:${fmtN(p.planScale)}`;
+      lines.push({ t: s, size: 1.9, fill: '#7A858F', gapBefore: lines.length ? 0.8 : 0 });
+    }
+    let y = m + CB.h + (lines.length ? 3 : 0);
+    const cap = [];
+    lines.forEach(l => {
+      y += (l.gapBefore || 0) + l.size * 1.1;
+      cap.push(`<text x="${r2(m)}" y="${r2(y)}" font-size="${l.size}"${l.weight ? ` font-weight="${l.weight}"` : ''} fill="${l.fill}">${esc(l.t)}</text>`);
+      y += l.size * 0.38;
+    });
+    const H = y + m;
+
+    const pre = kind;
+    const body = `<defs>${scene.defs}</defs>` +
+      (p.whiteBg ? `<rect x="0" y="0" width="${r2(W)}" height="${r2(H)}" fill="#ffffff"/>` : '') +
+      `<g transform="translate(${r2(tx)} ${r2(ty)})">${scene.els.join('')}</g>` + cap.join('');
+    const make = (wAttr, hAttr) =>
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${wAttr}" height="${hAttr}" viewBox="0 0 ${r2(W)} ${r2(H)}" font-family="Arial, Helvetica, sans-serif">${body}</svg>`;
+    return { W, H, warn, make, pre };
+  }
+
+  /* ---------------- render ---------------- */
+  const outputs = {};
+  function render() {
+    const p = readParams();
+    save();
+    const lay = layout(p);
+
+    const iso = isoScene(p, lay);
+    let isoMax = null;
+    if (p.isoFrame === 'shared') {
+      const pm = Object.assign({}, p, { L: p.maxL, D: p.maxD, storeys: p.maxS });
+      isoMax = isoScene(pm, layout(pm));
+    }
+    outputs.iso = compose(iso, isoMax, 'iso', p);
+
+    const plan = planScene(p, lay, 'plan');
+    let planMax = null;
+    if (p.planFrame === 'shared') {
+      const pm = Object.assign({}, p, { L: p.maxL, D: p.maxD, storeys: p.maxS });
+      planMax = planScene(pm, layout(pm), 'plan');
+    }
+    outputs.plan = compose(plan, planMax, 'plan', p);
+
+    show('iso', outputs.iso, p.isoScale, p.isoFrame);
+    show('plan', outputs.plan, p.planScale, p.planFrame);
+  }
+
+  function show(kind, out, scale, frame) {
+    const holder = $(kind + 'Out');
+    holder.innerHTML = out.make(`${r2(out.W)}mm`, `${r2(out.H)}mm`);
+    const svg = holder.querySelector('svg');
+    svg.style.width = (out.W * PREVIEW_PX_PER_MM) + 'px';
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', kind === 'iso' ? 'Isometric schematic' : 'Floor plan schematic');
+    $(kind + 'Meta').textContent = `${Math.round(out.W)} × ${Math.round(out.H)} mm at 1:${fmtN(scale)}`;
+    const w = $(kind + 'Warn');
+    if (out.warn) {
+      w.hidden = false;
+      w.textContent = 'This building is larger than the shared frame, so it is drawn on a fitted frame instead. Raise the largest length, depth or storeys under Scale and frame to keep every export the same size.';
+    } else if (frame === 'shared') {
+      w.hidden = true;
+    } else {
+      w.hidden = true;
+    }
+  }
+
+  /* ---------------- export ---------------- */
+  const CRC = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+    return t;
+  })();
+  function crc32(bytes) { let c = 0xFFFFFFFF; for (let i = 0; i < bytes.length; i++) c = CRC[(c ^ bytes[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+
+  // Writes the print resolution into the PNG so Word and PowerPoint place it at its true size
+  async function withDpi(blob, dpi) {
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    const ppm = Math.round(dpi / 0.0254);
+    const chunk = new Uint8Array(21);
+    const dv = new DataView(chunk.buffer);
+    dv.setUint32(0, 9);
+    chunk.set([0x70, 0x48, 0x59, 0x73], 4);
+    dv.setUint32(8, ppm); dv.setUint32(12, ppm); chunk[16] = 1;
+    dv.setUint32(17, crc32(chunk.subarray(4, 17)));
+    const parts = [buf.subarray(0, 33), chunk];
+    let i = 33;
+    const bdv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+    while (i + 8 <= buf.length) {
+      const len = bdv.getUint32(i);
+      const type = String.fromCharCode(buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7]);
+      const end = i + 12 + len;
+      if (type !== 'pHYs') parts.push(buf.subarray(i, end));
+      i = end;
+    }
+    return new Blob(parts, { type: 'image/png' });
+  }
+
+  function rasterize(out, dpi) {
+    return new Promise((resolve, reject) => {
+      const pw = Math.round(out.W / 25.4 * dpi), ph = Math.round(out.H / 25.4 * dpi);
+      const img = new Image();
+      img.onload = () => {
+        const cv = document.createElement('canvas');
+        cv.width = pw; cv.height = ph;
+        cv.getContext('2d').drawImage(img, 0, 0, pw, ph);
+        cv.toBlob(b => b ? resolve(b) : reject(new Error('PNG encoding failed')), 'image/png');
+      };
+      img.onerror = () => reject(new Error('Drawing could not be rasterized'));
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(out.make(pw, ph));
+    });
+  }
+
+  function fileBase(kind) {
+    const p = readParams();
+    const slug = (p.title || autoTitle(p)).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'schematic';
+    return `${slug}-${kind === 'iso' ? 'isometric' : 'plan'}`;
+  }
+  function download(blob, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800);
+  }
+  function flash(btn, text, ok = true) {
+    const orig = btn.dataset.label || btn.textContent;
+    btn.dataset.label = orig;
+    btn.textContent = text;
+    if (ok) btn.classList.add('done');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('done'); }, 1600);
+  }
+
+  document.querySelectorAll('.actions button').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const kind = btn.dataset.kind, out = outputs[kind];
+      if (!out) return;
+      const dpi = readParams().dpi;
+      try {
+        if (btn.dataset.act === 'svg') {
+          const str = '<?xml version="1.0" encoding="UTF-8"?>\n' + out.make(`${r2(out.W)}mm`, `${r2(out.H)}mm`);
+          download(new Blob([str], { type: 'image/svg+xml' }), fileBase(kind) + '.svg');
+          flash(btn, 'Downloaded');
+        } else if (btn.dataset.act === 'png') {
+          const blob = await withDpi(await rasterize(out, dpi), dpi);
+          download(blob, fileBase(kind) + '.png');
+          flash(btn, 'Downloaded');
+        } else {
+          const blob = await rasterize(out, dpi);
+          if (!(navigator.clipboard && window.ClipboardItem)) throw new Error('no clipboard');
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          flash(btn, 'Copied');
+        }
+      } catch (e) {
+        flash(btn, btn.dataset.act === 'copy' ? 'Copy blocked, use PNG' : 'Export failed', false);
+      }
+    });
+  });
+
+  /* ---------------- persistence, presets, wiring ---------------- */
+  const ALL_IDS = Object.keys(DEFAULTS);
+  function setVal(id, v) {
+    const el = $(id);
+    if (!el) return;
+    if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+  }
+  function save() {
+    try {
+      const o = {};
+      ALL_IDS.forEach(id => { o[id] = val(id); });
+      localStorage.setItem(STORE_KEY, JSON.stringify(o));
+    } catch (e) { /* storage unavailable: keep working in memory */ }
+  }
+  function load() {
+    let o = null;
+    try { o = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) { o = null; }
+    const src = Object.assign({}, DEFAULTS, o || {});
+    ALL_IDS.forEach(id => setVal(id, src[id]));
+  }
+
+  const presetSel = $('preset');
+  presetSel.innerHTML = PRESETS.map(pr => `<option value="${pr.id}">${esc(pr.name)}</option>`).join('') + '<option value="custom">Custom</option>';
+  presetSel.addEventListener('change', () => {
+    const pr = PRESETS.find(x => x.id === presetSel.value);
+    if (!pr) return;
+    Object.entries(pr.v).forEach(([id, v]) => setVal(id, v));
     render();
   });
-  heightInput.addEventListener('input', render);
-  unitsInput.addEventListener('input', render);
-  occInput.addEventListener('input', render);
-  for (const r of dimModeInputs) r.addEventListener('change', render);
-  syncBtn.addEventListener('click', syncNotes);
 
-  document.getElementById('addNoteRow').addEventListener('click', () => {
-    const li = createNoteLi('');
-    notesList.appendChild(li);
-    li.querySelector('.note-text').focus();
+  ALL_IDS.filter(id => id !== 'preset').forEach(id => {
+    const el = $(id);
+    const ev = (el.type === 'checkbox' || el.tagName === 'SELECT' || el.type === 'color') ? 'change' : 'input';
+    el.addEventListener(ev, () => {
+      if (BUILDING_FIELDS.includes(id)) presetSel.value = 'custom';
+      render();
+    });
+    if (el.type === 'color') el.addEventListener('input', render);
   });
 
-  const copyBtn = document.getElementById('copyBtn');
-  const cardEl = document.querySelector('.card');
-
-  copyBtn.addEventListener('click', async () => {
-    const originalLabel = copyBtn.textContent;
-    try {
-      const canvas = await html2canvas(cardEl, {
-        backgroundColor: '#ffffff',
-        scale: 2
-      });
-      canvas.toBlob(async (blob) => {
-        try {
-          if (navigator.clipboard && window.ClipboardItem) {
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-            copyBtn.textContent = 'Copied!';
-            copyBtn.classList.add('copied');
-          } else {
-            throw new Error('Clipboard image write not supported');
-          }
-        } catch (err) {
-          // Fallback: open the image in a new tab so it can be saved or copied manually
-          const url = URL.createObjectURL(blob);
-          window.open(url, '_blank');
-          copyBtn.textContent = 'Opened image tab';
-        }
-        setTimeout(() => {
-          copyBtn.textContent = originalLabel;
-          copyBtn.classList.remove('copied');
-        }, 1800);
-      }, 'image/png');
-    } catch (err) {
-      copyBtn.textContent = 'Copy failed';
-      setTimeout(() => { copyBtn.textContent = originalLabel; }, 1800);
-    }
+  $('fitPresets').addEventListener('click', () => {
+    setVal('maxL', Math.max(...PRESETS.map(x => x.v.len)));
+    setVal('maxD', Math.max(...PRESETS.map(x => x.v.dep)));
+    setVal('maxS', Math.max(...PRESETS.map(x => x.v.storeys)));
+    render();
+  });
+  $('resetColours').addEventListener('click', () => {
+    Object.entries(DEFAULT_COLOURS).forEach(([id, v]) => setVal(id, v));
+    render();
   });
 
+  load();
   render();
-  syncNotes();
 })();
 </script>
-
 </body>
 </html>
