@@ -312,6 +312,27 @@
       <p class="hint"><button type="button" class="linkbtn" id="fitPresets">Size the frame for all six archetypes</button></p>
     </details>
 
+    <details open>
+      <summary>Second building</summary>
+      <div class="checks">
+        <label style="grid-column: 1 / -1;"><input type="checkbox" id="bOn"> Draw a second building to the right</label>
+      </div>
+      <p class="hint">Both buildings use the same scale, ground line and drawing settings, so their sizes compare directly.</p>
+      <div class="grid">
+        <label class="f wide"><span>Start from</span><select id="bPreset"></select></label>
+        <label class="f"><span>Length (m)</span><input type="number" id="bLen" min="6" max="250" step="0.5"></label>
+        <label class="f"><span>Depth (m)</span><input type="number" id="bDep" min="8" max="60" step="0.5"></label>
+        <label class="f"><span>Storeys</span><input type="number" id="bStoreys" min="1" max="16" step="1"></label>
+        <label class="f"><span>Units per storey</span><input type="number" id="bUnits" min="2" max="40" step="1"></label>
+        <label class="f"><span>Occupants per storey</span><input type="number" id="bOcc" min="0" max="400" step="1"></label>
+        <label class="f"><span>Exit stairs</span>
+          <select id="bStairs"><option value="1">One (single egress)</option><option value="2">Two</option></select></label>
+        <label class="f"><span>Stair width (m)</span><input type="number" id="bFlight" min="0.9" max="2" step="0.05"></label>
+        <label class="f"><span>Space between (mm on paper)</span><input type="number" id="bGap" min="0" max="60" step="1"></label>
+      </div>
+      <p class="hint"><button type="button" class="linkbtn" id="swapAB">Swap the two buildings</button></p>
+    </details>
+
     <details>
       <summary>Caption</summary>
       <div class="grid">
@@ -400,8 +421,11 @@
     isoScale: 1000, planScale: 500, isoFrame: 'shared', planFrame: 'fit',
     maxL: 112.5, maxD: 20, maxS: 6, dpi: '300',
     title: '', notes: '', caption: true, scaleNote: true, whiteBg: true,
-    accent: DEFAULT_COLOURS.accent, balcColor: DEFAULT_COLOURS.balcColor, circColor: DEFAULT_COLOURS.circColor
+    accent: DEFAULT_COLOURS.accent, balcColor: DEFAULT_COLOURS.balcColor, circColor: DEFAULT_COLOURS.circColor,
+    bOn: false, bPreset: 'two4', bLen: 112.5, bDep: 20, bStoreys: 4, bUnits: 26, bOcc: 96, bStairs: '2', bFlight: 1.1, bGap: 10
   };
+  const B_FIELDS = ['bLen', 'bDep', 'bStoreys', 'bUnits', 'bOcc', 'bStairs', 'bFlight'];
+  const B_MAP = { len: 'bLen', dep: 'bDep', storeys: 'bStoreys', units: 'bUnits', occ: 'bOcc', stairs: 'bStairs', flight: 'bFlight' };
   const BUILDING_FIELDS = ['len', 'dep', 'storeys', 'fh', 'units', 'occ', 'stairs', 'flight', 'cw', 'elev', 'vest'];
   const STORE_KEY = 'ses-schematic-builder-v2';
 
@@ -514,8 +538,23 @@
       whiteBg: val('whiteBg'),
       accent: val('accent'),
       balc: val('balcColor'),
-      circ: val('circColor')
+      circ: val('circColor'),
+      bOn: val('bOn'),
+      bGap: clamp(num('bGap', 10), 0, 60)
     };
+  }
+
+  // The second building: same drawing settings, its own size and egress
+  function paramsB(p) {
+    return Object.assign({}, p, {
+      L: clamp(num('bLen', 30), 6, 250),
+      D: clamp(num('bDep', 20), 8, 60),
+      storeys: Math.round(clamp(num('bStoreys', 4), 1, 16)),
+      units: Math.round(clamp(num('bUnits', 4), 2, 40)),
+      occ: Math.round(clamp(num('bOcc', 0), 0, 400)),
+      stairs: parseInt(val('bStairs'), 10) === 2 ? 2 : 1,
+      flight: clamp(num('bFlight', 1.1), 0.9, 2)
+    });
   }
 
   /* ---------------- plan layout (shared by plan and isometric) ---------------- */
@@ -1061,47 +1100,89 @@
     return lines;
   }
 
-  function compose(scene, maxScene, kind, p) {
-    const m = 4;
-    let warn = false, CB = scene.bb, tx, ty;
+  // Lays one or more buildings out left to right on a common ground line (isometric)
+  // or common top edge (plan), at one scale, with optional per-building labels.
+  function compose(items, maxScene, kind, p) {
+    const m = 4, gap = p.bGap;
+    const scenes = items.map(it => it.scene);
+    const multi = items.length > 1;
+    let warn = false;
+
+    // distance from the top of each slot to the anchor, and from the anchor to the bottom
+    let slotW, refTop, refBot;
     if (maxScene) {
       const MB = maxScene.bb;
-      ty = kind === 'iso' ? m + (maxScene.anchor[1] - MB.y0) - scene.anchor[1] : m + (MB.h - scene.bb.h) / 2 - scene.bb.y0;
-      tx = m + (MB.w - scene.bb.w) / 2 - scene.bb.x0;
-      const top = scene.bb.y0 + ty, bot = scene.bb.y1 + ty;
-      if (scene.bb.w > MB.w + 0.01 || top < m - 0.01 || bot > m + MB.h + 0.01) warn = true;
-      else CB = MB;
+      refTop = maxScene.anchor[1] - MB.y0;
+      refBot = MB.y1 - maxScene.anchor[1];
+      slotW = scenes.map(() => MB.w);
+      scenes.forEach(sc => {
+        if (sc.bb.w > MB.w + 0.01 || sc.anchor[1] - sc.bb.y0 > refTop + 0.01 || sc.bb.y1 - sc.anchor[1] > refBot + 0.01) warn = true;
+      });
     }
-    if (!maxScene || warn) { CB = scene.bb; tx = m - CB.x0; ty = m - CB.y0; }
+    if (!maxScene || warn) {
+      refTop = Math.max(...scenes.map(sc => sc.anchor[1] - sc.bb.y0));
+      refBot = Math.max(...scenes.map(sc => sc.bb.y1 - sc.anchor[1]));
+      slotW = scenes.map(sc => sc.bb.w);
+    }
+    const contentH = refTop + refBot;
+    const slotX = [];
+    let x = m;
+    slotW.forEach((w, i) => { slotX.push(x); x += w + (i < slotW.length - 1 ? gap : 0); });
+    const W = x + m;
 
-    const W = CB.w + 2 * m;
+    const groups = scenes.map((sc, i) => {
+      const tx = slotX[i] + (slotW[i] - sc.bb.w) / 2 - sc.bb.x0;
+      const ty = m + refTop - sc.anchor[1];
+      return `<g transform="translate(${r2(tx)} ${r2(ty)})">${sc.els.join('')}</g>`;
+    });
+
+    const cap = [];
+    const textLine = (tx, ty, l) => `<text x="${r2(tx)}" y="${r2(ty)}" font-size="${l.size}"${l.weight ? ` font-weight="${l.weight}"` : ''} fill="${l.fill}">${esc(l.t)}</text>`;
+    let y = m + contentH;
+
+    // a short label under each building when comparing
+    if (multi && p.caption) {
+      let lowest = y;
+      items.forEach((it, i) => {
+        const bw = Math.max(slotW[i], 40);
+        const ls = [];
+        wrap(autoTitle(it.p), 2.6, bw).forEach(t => ls.push({ t, size: 2.6, weight: 600, fill: INK }));
+        const q = it.p;
+        const stat = `${fmtN(q.L)} × ${fmtN(q.D)} m, ${q.units} units per storey${q.occ ? `, ${q.occ} occupants` : ''}`;
+        wrap(stat, 2.1, bw).forEach(t => ls.push({ t, size: 2.1, fill: '#46525D' }));
+        let yy = y + 2.5;
+        ls.forEach(l => { yy += l.size * 1.1; cap.push(textLine(slotX[i], yy, l)); yy += l.size * 0.35; });
+        lowest = Math.max(lowest, yy);
+      });
+      y = lowest;
+    }
+
     const lines = [];
     if (p.caption) {
       const maxW = W - 2 * m;
-      wrap(p.title || autoTitle(p), 3.0, maxW).forEach(t => lines.push({ t, size: 3.0, weight: 600, fill: INK }));
-      const notes = p.notes.trim() ? p.notes.split('\n').map(s => s.trim()).filter(Boolean) : autoNotes(p);
+      const title = p.title || (multi ? 'Compared at the same scale' : autoTitle(p));
+      wrap(title, 3.0, maxW).forEach(t => lines.push({ t, size: 3.0, weight: 600, fill: INK }));
+      const notes = p.notes.trim() ? p.notes.split('\n').map(s => s.trim()).filter(Boolean) : (multi ? [] : autoNotes(p));
       notes.forEach(n => wrap(n, 2.3, maxW).forEach(t => lines.push({ t, size: 2.3, fill: '#46525D' })));
     }
     if (p.scaleNote) {
       const s = kind === 'iso' ? `Isometric, 1:${fmtN(p.isoScale)} along the building axes` : `Floor plan, 1:${fmtN(p.planScale)}`;
       lines.push({ t: s, size: 1.9, fill: '#7A858F', gapBefore: lines.length ? 0.8 : 0 });
     }
-    let y = m + CB.h + (lines.length ? 3 : 0);
-    const cap = [];
+    if (lines.length) y += multi && p.caption ? 3.5 : 3;
     lines.forEach(l => {
       y += (l.gapBefore || 0) + l.size * 1.1;
-      cap.push(`<text x="${r2(m)}" y="${r2(y)}" font-size="${l.size}"${l.weight ? ` font-weight="${l.weight}"` : ''} fill="${l.fill}">${esc(l.t)}</text>`);
+      cap.push(textLine(m, y, l));
       y += l.size * 0.38;
     });
     const H = y + m;
 
-    const pre = kind;
-    const body = `<defs>${scene.defs}</defs>` +
+    const body = `<defs>${scenes[0].defs}</defs>` +
       (p.whiteBg ? `<rect x="0" y="0" width="${r2(W)}" height="${r2(H)}" fill="#ffffff"/>` : '') +
-      `<g transform="translate(${r2(tx)} ${r2(ty)})">${scene.els.join('')}</g>` + cap.join('');
+      groups.join('') + cap.join('');
     const make = (wAttr, hAttr) =>
       `<svg xmlns="http://www.w3.org/2000/svg" width="${wAttr}" height="${hAttr}" viewBox="0 0 ${r2(W)} ${r2(H)}" font-family="Arial, Helvetica, sans-serif">${body}</svg>`;
-    return { W, H, warn, make, pre };
+    return { W, H, warn, make, multi };
   }
 
   /* ---------------- render ---------------- */
@@ -1109,23 +1190,16 @@
   function render() {
     const p = readParams();
     save();
-    const lay = layout(p);
+    const builds = [p];
+    if (p.bOn) builds.push(paramsB(p));
+    const lays = builds.map(layout);
+    const maxP = Object.assign({}, p, { L: p.maxL, D: p.maxD, storeys: p.maxS });
 
-    const iso = isoScene(p, lay);
-    let isoMax = null;
-    if (p.isoFrame === 'shared') {
-      const pm = Object.assign({}, p, { L: p.maxL, D: p.maxD, storeys: p.maxS });
-      isoMax = isoScene(pm, layout(pm));
-    }
-    outputs.iso = compose(iso, isoMax, 'iso', p);
+    const isoMax = p.isoFrame === 'shared' ? isoScene(maxP, layout(maxP)) : null;
+    outputs.iso = compose(builds.map((q, i) => ({ p: q, scene: isoScene(q, lays[i]) })), isoMax, 'iso', p);
 
-    const plan = planScene(p, lay, 'plan');
-    let planMax = null;
-    if (p.planFrame === 'shared') {
-      const pm = Object.assign({}, p, { L: p.maxL, D: p.maxD, storeys: p.maxS });
-      planMax = planScene(pm, layout(pm), 'plan');
-    }
-    outputs.plan = compose(plan, planMax, 'plan', p);
+    const planMax = p.planFrame === 'shared' ? planScene(maxP, layout(maxP), 'plan') : null;
+    outputs.plan = compose(builds.map((q, i) => ({ p: q, scene: planScene(q, lays[i], 'plan') })), planMax, 'plan', p);
 
     show('iso', outputs.iso, p.isoScale, p.isoFrame);
     show('plan', outputs.plan, p.planScale, p.planFrame);
@@ -1142,7 +1216,7 @@
     const w = $(kind + 'Warn');
     if (out.warn) {
       w.hidden = false;
-      w.textContent = 'This building is larger than the shared frame, so it is drawn on a fitted frame instead. Raise the largest length, depth or storeys under Scale and frame to keep every export the same size.';
+      w.textContent = (out.multi ? 'A building is larger than the shared frame, so both are drawn on a fitted frame instead.' : 'This building is larger than the shared frame, so it is drawn on a fitted frame instead.') + ' Raise the largest length, depth or storeys under Scale and frame to keep every export the same size.';
     } else if (frame === 'shared') {
       w.hidden = true;
     } else {
@@ -1198,7 +1272,7 @@
 
   function fileBase(kind) {
     const p = readParams();
-    const slug = (p.title || autoTitle(p)).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'schematic';
+    const slug = (p.title || (p.bOn ? `${autoTitle(p)} vs ${autoTitle(paramsB(p))}` : autoTitle(p))).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'schematic';
     return `${slug}-${kind === 'iso' ? 'isometric' : 'plan'}`;
   }
   function download(blob, name) {
@@ -1273,14 +1347,32 @@
     render();
   });
 
-  ALL_IDS.filter(id => id !== 'preset').forEach(id => {
+  const bPresetSel = $('bPreset');
+  bPresetSel.innerHTML = presetSel.innerHTML;
+  bPresetSel.addEventListener('change', () => {
+    const pr = PRESETS.find(x => x.id === bPresetSel.value);
+    if (!pr) return;
+    Object.entries(pr.v).forEach(([id, v]) => { if (B_MAP[id]) setVal(B_MAP[id], v); });
+    render();
+  });
+
+  ALL_IDS.filter(id => id !== 'preset' && id !== 'bPreset').forEach(id => {
     const el = $(id);
     const ev = (el.type === 'checkbox' || el.tagName === 'SELECT' || el.type === 'color') ? 'change' : 'input';
     el.addEventListener(ev, () => {
       if (BUILDING_FIELDS.includes(id)) presetSel.value = 'custom';
+      if (B_FIELDS.includes(id)) bPresetSel.value = 'custom';
       render();
     });
     if (el.type === 'color') el.addEventListener('input', render);
+  });
+
+  $('swapAB').addEventListener('click', () => {
+    const a = {}, b = {};
+    Object.keys(B_MAP).forEach(id => { a[id] = val(id); b[id] = val(B_MAP[id]); });
+    Object.keys(B_MAP).forEach(id => { setVal(id, b[id]); setVal(B_MAP[id], a[id]); });
+    const pa = presetSel.value; presetSel.value = bPresetSel.value; bPresetSel.value = pa;
+    render();
   });
 
   $('fitPresets').addEventListener('click', () => {
