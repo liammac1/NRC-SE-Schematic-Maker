@@ -256,10 +256,15 @@
           <select id="stairs"><option value="1">One (single egress)</option><option value="2">Two</option></select></label>
         <label class="f"><span>Stair width (m)</span><input type="number" id="flight" min="0.9" max="2" step="0.05"></label>
         <label class="f"><span>Corridor width (m)</span><input type="number" id="cw" min="0.9" max="4" step="0.1"></label>
+        <span></span>
+        <label class="f"><span>Hallway past stair, left (m)</span><input type="number" id="hallL" min="0" max="120" step="0.5" placeholder="Auto"></label>
+        <label class="f"><span>Hallway past stair, right (m)</span><input type="number" id="hallR" min="0" max="120" step="0.5" placeholder="Auto"></label>
       </div>
+      <p class="hint" id="hallNote"></p>
       <div class="checks">
         <label><input type="checkbox" id="elev"> Elevator</label>
         <label><input type="checkbox" id="vest"> Stair vestibule</label>
+        <label style="grid-column: 1 / -1;"><input type="checkbox" id="deadEnd"> Limit dead-end corridors to 6 m</label>
       </div>
     </details>
 
@@ -285,10 +290,11 @@
         <label><input type="checkbox" id="planLabels"> Unit labels</label>
         <label><input type="checkbox" id="planDoors"> Door swings</label>
         <label><input type="checkbox" id="planTravel"> Travel distances</label>
+        <label style="grid-column: 1 / -1;"><input type="checkbox" id="unitLt25"> Show in-unit travel as &lt;25 m (single exit stair)</label>
         <label><input type="checkbox" id="planDims"> Dimensions</label>
         <label><input type="checkbox" id="planBar"> Scale bar</label>
       </div>
-      <p class="hint">Travel lines run from each suite door to its farthest corner, and along the corridor to the nearest exit stair door.</p>
+      <p class="hint">Travel lines run from each suite door to its farthest corner. Along the corridor they show each dead end (stair door to hallway end) and, with two stairs, the longest run between them. With the &lt;25 m option on, any suite measuring over 25 m still shows its real distance.</p>
     </details>
 
     <details open>
@@ -328,8 +334,11 @@
         <label class="f"><span>Exit stairs</span>
           <select id="bStairs"><option value="1">One (single egress)</option><option value="2">Two</option></select></label>
         <label class="f"><span>Stair width (m)</span><input type="number" id="bFlight" min="0.9" max="2" step="0.05"></label>
+        <label class="f"><span>Hallway past stair, left (m)</span><input type="number" id="bHallL" min="0" max="120" step="0.5" placeholder="Auto"></label>
+        <label class="f"><span>Hallway past stair, right (m)</span><input type="number" id="bHallR" min="0" max="120" step="0.5" placeholder="Auto"></label>
         <label class="f"><span>Space between (mm on paper)</span><input type="number" id="bGap" min="0" max="60" step="1"></label>
       </div>
+      <p class="hint" id="bHallNote"></p>
       <p class="hint"><button type="button" class="linkbtn" id="swapAB">Swap the two buildings</button></p>
     </details>
 
@@ -417,16 +426,16 @@
     preset: 'ses4', len: 30, dep: 20, storeys: 4, fh: 3, units: 4, occ: 30, stairs: '1', flight: 1.5, cw: 1.5,
     elev: true, vest: false,
     isoStyle: 'solid', hlabel: 'm', balc: true, overrun: true, context: true, isoDims: true,
-    planLabels: true, planDoors: true, planTravel: true, planDims: true, planBar: true,
+    planLabels: true, planDoors: true, planTravel: true, planDims: true, planBar: true, unitLt25: false, deadEnd: true,
     isoScale: 1000, planScale: 500, isoFrame: 'shared', planFrame: 'fit',
     maxL: 112.5, maxD: 20, maxS: 6, dpi: '300',
     title: '', notes: '', caption: true, scaleNote: true, whiteBg: true,
     accent: DEFAULT_COLOURS.accent, balcColor: DEFAULT_COLOURS.balcColor, circColor: DEFAULT_COLOURS.circColor,
-    bOn: false, bPreset: 'two4', bLen: 112.5, bDep: 20, bStoreys: 4, bUnits: 26, bOcc: 96, bStairs: '2', bFlight: 1.1, bGap: 10
+    bOn: false, bPreset: 'two4', bLen: 112.5, bDep: 20, bStoreys: 4, bUnits: 26, bOcc: 96, bStairs: '2', bFlight: 1.1, bGap: 10, hallL: '', hallR: '', bHallL: '', bHallR: ''
   };
-  const B_FIELDS = ['bLen', 'bDep', 'bStoreys', 'bUnits', 'bOcc', 'bStairs', 'bFlight'];
-  const B_MAP = { len: 'bLen', dep: 'bDep', storeys: 'bStoreys', units: 'bUnits', occ: 'bOcc', stairs: 'bStairs', flight: 'bFlight' };
-  const BUILDING_FIELDS = ['len', 'dep', 'storeys', 'fh', 'units', 'occ', 'stairs', 'flight', 'cw', 'elev', 'vest'];
+  const B_FIELDS = ['bLen', 'bDep', 'bStoreys', 'bUnits', 'bOcc', 'bStairs', 'bFlight', 'bHallL', 'bHallR'];
+  const B_MAP = { len: 'bLen', dep: 'bDep', storeys: 'bStoreys', units: 'bUnits', occ: 'bOcc', stairs: 'bStairs', flight: 'bFlight', hallL: 'bHallL', hallR: 'bHallR' };
+  const BUILDING_FIELDS = ['len', 'dep', 'storeys', 'fh', 'units', 'occ', 'stairs', 'flight', 'cw', 'elev', 'vest', 'hallL', 'hallR'];
   const STORE_KEY = 'ses-schematic-builder-v2';
 
   /* ---------------- small helpers ---------------- */
@@ -497,6 +506,7 @@
     if (el.type === 'checkbox') return el.checked;
     return el.value;
   }
+  function optNum(id) { const t = String($(id).value).trim(); const v = parseFloat(t); return t !== '' && isFinite(v) && v >= 0 ? v : NaN; }
   function num(id, def) { const v = parseFloat($(id).value); return isFinite(v) ? v : def; }
 
   function readParams() {
@@ -510,6 +520,8 @@
       stairs: parseInt(val('stairs'), 10) === 2 ? 2 : 1,
       flight: clamp(num('flight', 1.1), 0.9, 2),
       cw: clamp(num('cw', 1.5), 0.9, 4),
+      hallL: optNum('hallL'),
+      hallR: optNum('hallR'),
       elevator: val('elev'),
       vestibule: val('vest'),
       isoStyle: val('isoStyle'),
@@ -523,6 +535,8 @@
       planTravel: val('planTravel'),
       planDims: val('planDims'),
       planBar: val('planBar'),
+      unitLt25: val('unitLt25'),
+      deadEnd: val('deadEnd'),
       isoScale: clamp(num('isoScale', 1000), 50, 5000),
       planScale: clamp(num('planScale', 500), 50, 5000),
       isoFrame: val('isoFrame'),
@@ -553,7 +567,9 @@
       units: Math.round(clamp(num('bUnits', 4), 2, 40)),
       occ: Math.round(clamp(num('bOcc', 0), 0, 400)),
       stairs: parseInt(val('bStairs'), 10) === 2 ? 2 : 1,
-      flight: clamp(num('bFlight', 1.1), 0.9, 2)
+      flight: clamp(num('bFlight', 1.1), 0.9, 2),
+      hallL: optNum('bHallL'),
+      hallR: optNum('bHallR')
     });
   }
 
@@ -561,6 +577,22 @@
   const split = (a, b, n) => Array.from({ length: n }, (_, i) => [a + (b - a) * i / n, a + (b - a) * (i + 1) / n]);
   const rectPoly = (x0, x1, y0, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
   const doorCentre = (a, b, c0, c1) => (Math.max(a, c0) + Math.min(b, c1)) / 2;
+
+  const DEAD_END = 6.0;
+
+  // Split [a, b] into n bays; if any inner boundary falls outside [lo, hi], spread them across [lo, hi]
+  function fitBays(a, b, n, lo, hi) {
+    const even = split(a, b, n);
+    if (n < 2) return even;
+    const inner = even.slice(1).map(q => q[0]);
+    if (inner.every(x => x >= lo - 1e-6 && x <= hi + 1e-6)) return even;
+    let bounds;
+    if (hi <= lo) bounds = inner.map(() => (lo + hi) / 2);
+    else if (inner.length === 1) bounds = [clamp((a + b) / 2, lo, hi)];
+    else bounds = inner.map((_, i) => lo + (hi - lo) * i / (inner.length - 1));
+    const edges = [a, ...bounds, b];
+    return edges.slice(0, -1).map((x, i) => [x, edges[i + 1]]);
+  }
 
   function allocate(n, spans) {
     const lens = spans.map(s => s[1] - s[0]);
@@ -608,6 +640,7 @@
     }
 
     let north = [], south = [];
+    let hall = { applies: false };
     if (p.stairs === 1) {
       const coreW = shaftW + (p.elevator ? elevW : 0);
       const c = stairCore(L / 2 - coreW / 2, p.elevator);
@@ -620,20 +653,71 @@
       } else {
         const nps = Math.max(1, Math.floor(N / 4));
         const ns = N - 2 * nps;
-        const nl = split(0, c.x0, nps), nr = split(c.x1, L, nps), sb = split(0, L, ns);
+        const dx = c.doorX;
+        let nl = split(0, c.x0, nps), nr = split(c.x1, L, nps), sb = split(0, L, ns);
         let cx0 = Math.min(sb[0][1], nl[0][1]) - 1.4;
         let cx1 = Math.max(sb[ns - 1][0], nr[nps - 1][0]) + 1.4;
-        cx0 = Math.min(cx0, c.doorX - 1.0);
-        cx1 = Math.max(cx1, c.doorX + 1.0);
+        cx0 = Math.min(cx0, dx - 1.0);
+        cx1 = Math.max(cx1, dx + 1.0);
         if (cx0 < 1) cx0 = 0;
         if (cx1 > L - 1) cx1 = L;
+
+        // Hallway length on each side, measured from the stair door to the end of the hallway.
+        // Past the stair door each side is a dead-end corridor, limited to 6 m when the rule is on.
+        const cap = p.deadEnd ? DEAD_END : Infinity;
+        const minL = dx - c.x0 + 1.4, maxL = Math.max(minL, Math.min(dx, cap));
+        const minR = c.x1 - dx + 1.4, maxR = Math.max(minR, Math.min(L - dx, cap));
+        const autoL = dx - cx0, autoR = cx1 - dx;
+        let wantL = p.hallL, wantR = p.hallR, autoCapL = false, autoCapR = false;
+        if (!isFinite(wantL) && autoL > cap + 0.05) { wantL = cap; autoCapL = true; }
+        if (!isFinite(wantR) && autoR > cap + 0.05) { wantR = cap; autoCapR = true; }
+        const manL = isFinite(wantL), manR = isFinite(wantR);
+        hall = { applies: true, kind: 'ses', minL, minR, maxL, maxR, autoCapL, autoCapR };
+        if (manL) {
+          const t = clamp(wantL, minL, maxL);
+          hall.cappedL = isFinite(p.hallL) && p.hallL > cap + 0.05;
+          hall.clampedL = !hall.cappedL && isFinite(p.hallL) && Math.abs(t - p.hallL) > 0.05;
+          cx0 = Math.max(0, dx - t);
+        }
+        if (manR) {
+          const t = clamp(wantR, minR, maxR);
+          hall.cappedR = isFinite(p.hallR) && p.hallR > cap + 0.05;
+          hall.clampedR = !hall.cappedR && isFinite(p.hallR) && Math.abs(t - p.hallR) > 0.05;
+          cx1 = Math.min(L, dx + t);
+        }
+        hall.left = dx - cx0;
+        hall.right = cx1 - dx;
+
+        // Move suite boundaries so every suite still opens onto the hallway
+        nl = fitBays(0, c.x0, nps, cx0 + 1.4, c.x0 - 1.4);
+        nr = fitBays(c.x1, L, nps, c.x1 + 1.4, cx1 - 1.4);
+        sb = fitBays(0, L, ns, cx0 + 1.4, cx1 - 1.4);
+
+        const doorAt = (a, b) => {
+          if (manL && a <= cx0 + 0.01) return cx0 + 0.7;
+          if (manR && b >= cx1 - 0.01) return cx1 - 0.7;
+          return doorCentre(a, b, cx0, cx1);
+        };
         corr = { x0: cx0, x1: cx1, y0: yc0, y1: yc1 };
-        nl.concat(nr).forEach(([a, b]) => north.push({ poly: rectPoly(a, b, 0, yc0), lab: [a, b, 0, yc0], door: { x: doorCentre(a, b, cx0, cx1), y: yc0, dir: 'N' } }));
-        sb.forEach(([a, b], i) => south.push({ poly: southPoly(a, b, i === 0, i === ns - 1, cx0, cx1), lab: [a, b, yc1, D], door: { x: doorCentre(a, b, cx0, cx1), y: yc1, dir: 'S' } }));
+        nl.concat(nr).forEach(([a, b]) => north.push({ poly: rectPoly(a, b, 0, yc0), lab: [a, b, 0, yc0], door: { x: doorAt(a, b), y: yc0, dir: 'N' } }));
+        sb.forEach(([a, b], i) => south.push({ poly: southPoly(a, b, i === 0, i === ns - 1, cx0, cx1), lab: [a, b, yc1, D], door: { x: doorAt(a, b), y: yc1, dir: 'S' } }));
         southBays = sb;
       }
     } else {
-      const s1 = stairCore(0, false), s2 = stairCore(L - shaftW, false);
+      // Stairs sit in from each end; the hallway past each stair door is a dead end (6 m maximum)
+      const cap = p.deadEnd ? DEAD_END : Infinity;
+      const half = shaftW / 2;
+      const minE = half, maxE = Math.max(minE, Math.min(cap, L / 2 - shaftW - 1));
+      const dflt = Math.min(DEAD_END, cap);
+      const tL = clamp(isFinite(p.hallL) ? p.hallL : dflt, minE, maxE);
+      const tR = clamp(isFinite(p.hallR) ? p.hallR : dflt, minE, maxE);
+      hall = {
+        applies: true, kind: 'two', left: tL, right: tR, minL: minE, maxL: maxE, minR: minE, maxR: maxE,
+        cappedL: isFinite(p.hallL) && p.hallL > cap + 0.05, cappedR: isFinite(p.hallR) && p.hallR > cap + 0.05
+      };
+      hall.clampedL = !hall.cappedL && isFinite(p.hallL) && Math.abs(tL - p.hallL) > 0.05;
+      hall.clampedR = !hall.cappedR && isFinite(p.hallR) && Math.abs(tR - p.hallR) > 0.05;
+      const s1 = stairCore(tL - half, false), s2 = stairCore(L - tR - half, false);
       cores.push(s1, s2);
       const obst = [[s1.x0, s1.x1], [s2.x0, s2.x1]];
       if (p.elevator) { const e = elevCore(L / 2); cores.push(e); obst.push([e.x0, e.x1]); }
@@ -645,6 +729,13 @@
       corr = { x0: 0, x1: L, y0: yc0, y1: yc1 };
       const nn = Math.floor(N / 2), ns = N - nn;
       const alloc = allocate(nn, spans);
+      // give short end spans (beside an inset stair) a suite of their own where possible
+      spans.forEach((sp, i) => {
+        if (alloc[i] === 0 && sp[1] - sp[0] >= 2.5) {
+          const j = alloc.indexOf(Math.max(...alloc));
+          if (alloc[j] > 1) { alloc[j]--; alloc[i]++; }
+        }
+      });
       spans.forEach((s, i) => {
         if (alloc[i] > 0) split(s[0], s[1], alloc[i]).forEach(([a, b]) => north.push({ poly: rectPoly(a, b, 0, yc0), lab: [a, b, 0, yc0], door: { x: (a + b) / 2, y: yc0, dir: 'N' } }));
         else north.push({ poly: rectPoly(s[0], s[1], 0, yc0), lab: null, door: null, common: true });
@@ -660,7 +751,7 @@
     let n = 1;
     north.concat(south).forEach(u => { if (!u.common) { u.num = n++; } units.push(u); });
 
-    return { L, D, cw, rd, yc0, yc1, ym, cores, units, corr, southBays, shaftW, vd, special: p.stairs === 1 && N <= 2 };
+    return { hall, L, D, cw, rd, yc0, yc1, ym, cores, units, corr, southBays, shaftW, vd, special: p.stairs === 1 && N <= 2 };
   }
 
   /* ---------------- isometric scene ---------------- */
@@ -846,6 +937,13 @@
     return { els: c.els, bb: c.bb, anchor: P(L, D, 0), defs: '' };
   }
 
+  // In-unit travel label: "<25 m" for single exit stair buildings when asked, unless the measured
+  // distance is longer, in which case the real value is shown so the drawing never understates it
+  function unitTravelText(fd, q) {
+    if (q.unitLt25 && q.stairs === 1 && fd <= 25) return '<25\u202Fm';
+    return fmtM(fd);
+  }
+
   /* ---------------- floor plan scene ---------------- */
   function planScene(p, lay, pre) {
     const k = 1000 / p.planScale;
@@ -973,7 +1071,7 @@
         let X = ((a + b) / 2) * k, Y = cy * k + size * 0.35;
         if (p.planTravel && u.door) {
           const t = farthest(u), A = Q(...t.d), B = Q(...t.end);
-          const M = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2], mr = textW(fmtM(t.fd), 1.9) / 2 + 0.8;
+          const M = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2], mr = textW(unitTravelText(t.fd, p), 1.9) / 2 + 0.8;
           const hitsMid = r => { const nx = clamp(M[0], r[0], r[2]), ny = clamp(M[1], r[1], r[3]); return Math.hypot(nx - M[0], ny - M[1]) < mr; };
           const inner = [a * k + 0.5, y0 * k + 0.5, b * k - 0.5, y1 * k - 0.5];
           const fits = r => r[0] >= inner[0] && r[2] <= inner[2] && r[1] >= inner[1] && r[3] <= inner[3];
@@ -1018,7 +1116,7 @@
         const A = Q(d[0], d[1]), B = Q(end[0], end[1]);
         c.line(A, B, RED, 0.2);
         c.circle(B, 0.35, RED);
-        lab(A, B, fmtM(fd));
+        lab(A, B, unitTravelText(fd, p));
       });
       const stairs = lay.cores.filter(co => co.stair).map(co => co.doorX);
       const doors = lay.units.filter(u => u.door && (u.door.dir === 'N' || u.door.dir === 'S')).map(u => u.door.x);
@@ -1032,15 +1130,18 @@
         if (Math.abs(B[0] - A[0]) > textW(txt, size) + 1) c.text((A[0] + B[0]) / 2, A[1] + size * 0.36, size, txt, { anchor: 'middle', fill: RED, halo: true, weight: 600 });
       };
       if (doors.length && stairs.length && !lay.special) {
+        // dead-end lengths: stair door to the end of the hallway
         if (stairs.length === 1) {
-          const t = stairs[0];
-          const left = doors.filter(x => x < t), right = doors.filter(x => x > t);
-          if (left.length) run(Math.min(...left), t);
-          if (right.length) run(t, Math.max(...right));
+          run(corr.x0, stairs[0]);
+          run(stairs[0], corr.x1);
         } else {
+          const sl = Math.min(...stairs), sr = Math.max(...stairs);
+          run(corr.x0, sl);
+          run(sr, corr.x1);
+          // longest run between the stairs: farthest suite door to its nearest stair
           let best = null, bd = -1;
-          doors.forEach(x => {
-            const near = stairs.reduce((m, s) => Math.abs(s - x) < Math.abs(m - x) ? s : m, stairs[0]);
+          doors.filter(x => x > sl && x < sr).forEach(x => {
+            const near = x - sl < sr - x ? sl : sr;
             const dd = Math.abs(near - x);
             if (dd > bd) { bd = dd; best = [x, near]; }
           });
@@ -1193,6 +1294,8 @@
     const builds = [p];
     if (p.bOn) builds.push(paramsB(p));
     const lays = builds.map(layout);
+    hallNote('hallNote', lays[0].hall, p);
+    hallNote('bHallNote', p.bOn ? lays[1].hall : null, p.bOn ? builds[1] : null);
     const maxP = Object.assign({}, p, { L: p.maxL, D: p.maxD, storeys: p.maxS });
 
     const isoMax = p.isoFrame === 'shared' ? isoScene(maxP, layout(maxP)) : null;
@@ -1203,6 +1306,24 @@
 
     show('iso', outputs.iso, p.isoScale, p.isoFrame);
     show('plan', outputs.plan, p.planScale, p.planFrame);
+  }
+
+  function hallNote(id, h, q) {
+    const el = $(id);
+    if (!h) { el.textContent = ''; return; }
+    if (!h.applies) { el.textContent = 'Hallway lengths do not apply to the two-unit single stair layout, which has no corridor.'; return; }
+    let t = h.kind === 'two'
+      ? `Dead ends of ${fmtM(h.left)} past the left stair and ${fmtM(h.right)} past the right stair.`
+      : `Hallway runs ${fmtM(h.left)} left and ${fmtM(h.right)} right of the stair door.`;
+    const sides = [];
+    if (h.autoCapL || h.cappedL) sides.push('left');
+    if (h.autoCapR || h.cappedR) sides.push('right');
+    if (sides.length) t += ` The ${sides.join(' and ')} side${sides.length > 1 ? 's were' : ' was'} shortened to the 6\u202Fm dead-end corridor limit.`;
+    const lim = [];
+    if (h.clampedL) lim.push(`left is limited to ${fmtM(h.minL)} to ${fmtM(h.maxL)}`);
+    if (h.clampedR) lim.push(`right is limited to ${fmtM(h.minR)} to ${fmtM(h.maxR)}`);
+    if (lim.length) t += ` For this core and footprint, ${lim.join(' and ')}.`;
+    el.textContent = t;
   }
 
   function show(kind, out, scale, frame) {
@@ -1344,6 +1465,7 @@
     const pr = PRESETS.find(x => x.id === presetSel.value);
     if (!pr) return;
     Object.entries(pr.v).forEach(([id, v]) => setVal(id, v));
+    setVal('hallL', ''); setVal('hallR', '');
     render();
   });
 
@@ -1353,6 +1475,7 @@
     const pr = PRESETS.find(x => x.id === bPresetSel.value);
     if (!pr) return;
     Object.entries(pr.v).forEach(([id, v]) => { if (B_MAP[id]) setVal(B_MAP[id], v); });
+    setVal('bHallL', ''); setVal('bHallR', '');
     render();
   });
 
