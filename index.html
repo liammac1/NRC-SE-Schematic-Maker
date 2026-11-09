@@ -273,12 +273,15 @@
       <div class="grid">
         <label class="f"><span>Style</span>
           <select id="isoStyle"><option value="solid">Solid massing</option><option value="xray">See-through core</option></select></label>
+        <label class="f"><span>Egress line</span>
+          <select id="pathStyle"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></label>
         <label class="f"><span>Height label</span>
           <select id="hlabel"><option value="m">Metres</option><option value="storeys">Storeys</option><option value="both">Both</option></select></label>
       </div>
       <div class="checks">
         <label><input type="checkbox" id="balc"> Balconies</label>
         <label><input type="checkbox" id="overrun"> Stair overrun</label>
+        <label style="grid-column: 1 / -1;"><input type="checkbox" id="egress"> Egress path</label>
         <label><input type="checkbox" id="context"> Trees and ground</label>
         <label><input type="checkbox" id="isoDims"> Dimensions</label>
       </div>
@@ -347,6 +350,7 @@
       <div class="grid">
         <label class="f wide"><span>Title (blank uses an automatic title)</span><input type="text" id="title"></label>
         <label class="f wide"><span>Notes, one per line (blank uses building values)</span><textarea id="notes"></textarea></label>
+        <p class="hint f wide" style="margin:0">Always included and cannot be removed: “Drawing created with AI assistance.”</p>
       </div>
       <div class="checks">
         <label><input type="checkbox" id="caption"> Show caption</label>
@@ -360,6 +364,7 @@
       <div class="grid">
         <label class="f"><span>Exit stair</span><span class="colour"><input type="color" id="accent"></span></label>
         <label class="f"><span>Balconies</span><span class="colour"><input type="color" id="balcColor"></span></label>
+        <label class="f"><span>Egress path</span><span class="colour"><input type="color" id="pathColor"></span></label>
         <label class="f"><span>Corridor</span><span class="colour"><input type="color" id="circColor"></span></label>
       </div>
       <p class="hint"><button type="button" class="linkbtn" id="resetColours">Reset colours</button></p>
@@ -410,7 +415,9 @@
   const fmtM = v => (Math.round(v * 10) / 10).toFixed(1) + '\u202Fm';
   const fmtN = v => String(+(+v).toFixed(1));
 
-  const DEFAULT_COLOURS = { accent: '#E2582A', balcColor: '#F0B53A', circColor: '#DCEBD6' };
+  // Transparency note: always printed on every drawing and cannot be switched off
+  const AI_NOTE = 'Drawing created with AI assistance.';
+  const DEFAULT_COLOURS = { accent: '#E2582A', balcColor: '#F0B53A', circColor: '#DCEBD6', pathColor: '#0A8A3F' };
 
   /* ---------------- presets (TG-SE-RA archetypes, Table 7) ---------------- */
   const PRESETS = [
@@ -430,7 +437,7 @@
     isoScale: 1000, planScale: 500, isoFrame: 'shared', planFrame: 'fit',
     maxL: 112.5, maxD: 20, maxS: 6, dpi: '300',
     title: '', notes: '', caption: true, scaleNote: true, whiteBg: true,
-    accent: DEFAULT_COLOURS.accent, balcColor: DEFAULT_COLOURS.balcColor, circColor: DEFAULT_COLOURS.circColor,
+    accent: DEFAULT_COLOURS.accent, balcColor: DEFAULT_COLOURS.balcColor, circColor: DEFAULT_COLOURS.circColor, pathColor: DEFAULT_COLOURS.pathColor, egress: true, pathStyle: 'solid',
     bOn: false, bPreset: 'two4', bLen: 112.5, bDep: 20, bStoreys: 4, bUnits: 26, bOcc: 96, bStairs: '2', bFlight: 1.1, bGap: 10, hallL: '', hallR: '', bHallL: '', bHallR: ''
   };
   const B_FIELDS = ['bLen', 'bDep', 'bStoreys', 'bUnits', 'bOcc', 'bStairs', 'bFlight', 'bHallL', 'bHallR'];
@@ -553,6 +560,9 @@
       accent: val('accent'),
       balc: val('balcColor'),
       circ: val('circColor'),
+      pathColor: val('pathColor'),
+      egress: val('egress'),
+      pathStyle: val('pathStyle'),
       bOn: val('bOn'),
       bGap: clamp(num('bGap', 10), 0, 60)
     };
@@ -791,6 +801,64 @@
     const longF = [P(0, D, 0), P(L, D, 0), P(L, D, H), P(0, D, H)];
     const endF = [P(L, 0, 0), P(L, D, 0), P(L, D, H), P(L, 0, H)];
 
+    // Egress route: farthest suite on the top storey, along the hallway, down the stair, out at grade
+    function drawEgress(zt) {
+      const stairs = lay.cores.filter(co => co.stair);
+      let best = null;
+      lay.units.forEach(u => {
+        if (!u.door) return;
+        const d = [u.door.x, u.door.y];
+        let far = null, fd = -1;
+        u.poly.forEach(v => { const dd = Math.hypot(v[0] - d[0], v[1] - d[1]); if (dd > fd) { fd = dd; far = v; } });
+        const st = stairs.reduce((m, s) => Math.abs(s.doorX - d[0]) < Math.abs(m.doorX - d[0]) ? s : m, stairs[0]);
+        const tot = fd + Math.abs(st.doorX - d[0]);
+        if (!best || tot > best.tot) best = { u, d, far, fd, st, tot };
+      });
+      if (!best) return;
+      const { d, far, fd, st } = best;
+      const ym = lay.ym, s = st.stair;
+      const pts = [];
+      // start just inside the far corner, curve to the suite door
+      const S = [far[0] + (d[0] - far[0]) / fd * 1.2, far[1] + (d[1] - far[1]) / fd * 1.2];
+      const my = (S[1] + d[1]) / 2;
+      const C1 = [S[0], my], C2 = [d[0], my];
+      for (let i = 0; i <= 28; i++) {
+        const t = i / 28, a = (1 - t) ** 3, b = 3 * (1 - t) ** 2 * t, cc = 3 * (1 - t) * t * t, e = t ** 3;
+        pts.push([a * S[0] + b * C1[0] + cc * C2[0] + e * d[0], a * S[1] + b * C1[1] + cc * C2[1] + e * d[1], zt]);
+      }
+      // along the hallway to the stair, through any vestibule, into the shaft
+      if (best.u.door.dir === 'N' || best.u.door.dir === 'S') pts.push([d[0], ym, zt]);
+      pts.push([st.doorX, ym, zt]);
+      if (st.vest) pts.push([st.doorX, lay.rd - lay.vd / 2, zt], [st.stairDoorX, lay.rd - lay.vd / 2, zt]);
+      // smooth coil down the stair: one loop per storey, stretched along the flights so each loop reads
+      const h = s.y1 - s.y0, w = s.x1 - s.x0;
+      const land = Math.min(Math.max(p.flight, 1.1), h * 0.3);
+      const xc = (s.x0 + s.x1) / 2;
+      const yNear = s.y1 - land * 0.5, yFar = s.y0 + land * 0.5;
+      const yc = (yNear + yFar) / 2, ay = (yNear - yFar) / 2, ax = Math.max(w * 0.42, 1.3);
+      pts.push([st.stairDoorX, s.y1, zt]);
+      const turns = p.storeys - 1;
+      const per = 64;
+      for (let i = 0; i <= turns * per; i++) {
+        const th = (i / per) * 2 * Math.PI;
+        pts.push([xc + ax * Math.sin(th), yc + ay * Math.cos(th), Math.max(0.02, zt - fh * th / (2 * Math.PI))]);
+      }
+      // out at grade through the ground floor to the street side
+      pts.push([st.stairDoorX, s.y1, 0.02], [st.stairDoorX, ym, 0.02], [st.stairDoorX, D + 3.5, 0.02]);
+
+      const scr = pts.map(q => P(q[0], q[1], q[2]));
+      const col = p.pathColor;
+      const style = p.pathStyle === 'dotted' ? 'stroke-dasharray="0 1.3"' : p.pathStyle === 'dashed' ? 'stroke-dasharray="1.6 1.0"' : '';
+      c.pl(scr, '#ffffff', 1.7);
+      c.pl(scr, col, p.pathStyle === 'dotted' ? 0.85 : 0.7, style);
+      c.circle(scr[0], 1.1, col, '#ffffff', 0.4);
+      // arrowhead at the exit
+      const a = scr[scr.length - 2], b = scr[scr.length - 1];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len, ah = 2.4, aw = 1.3;
+      c.poly([b, [b[0] - ux * ah - uy * aw, b[1] - uy * ah + ux * aw], [b[0] - ux * ah + uy * aw, b[1] - uy * ah - ux * aw]], col, '#ffffff', 0.2);
+    }
+
     // overrun volumes above the roof
     const overruns = [];
     if (p.overrun) {
@@ -805,6 +873,24 @@
       else box(o.x0, o.x1, o.y0, o.y1, H, H + o.h, '#EEF0F2', '#D9DEE2', '#C2CAD0');
     });
 
+    const showPath = p.egress && lay.cores.some(co => co.stair);
+    const zt = (p.storeys - 1) * fh + 0.02;
+
+    // Stair shaft outline drawn over the massing, so the egress zigzag has a stair to sit in
+    function ghostStairs() {
+      const ec = mix(acc, '#000000', 0.15);
+      const dash = 'stroke-dasharray="1.0 0.6"';
+      lay.cores.filter(co => co.stair).forEach(co => {
+        const x0 = co.stair.x0, x1 = co.stair.x1, y0 = 0, y1 = lay.rd;
+        const top = p.overrun ? H + 3.0 : H;
+        c.poly([P(x0, y1, 0), P(x1, y1, 0), P(x1, y1, top), P(x0, y1, top)], 'rgba(255,255,255,0.35)');
+        [[P(x0, y1, 0), P(x1, y1, 0)], [P(x1, y1, 0), P(x1, y0, 0)], [P(x0, y1, 0), P(x0, y1, top)],
+         [P(x1, y1, 0), P(x1, y1, top)], [P(x1, y0, 0), P(x1, y0, top)], [P(x0, y0, 0), P(x0, y0, top)],
+         [P(x0, y0, 0), P(x0, y1, 0)], [P(x0, y0, 0), P(x1, y0, 0)]]
+          .forEach(([a, b]) => c.line(a, b, ec, 0.28, dash));
+      });
+    }
+
     if (p.isoStyle === 'xray') {
       const dash = 'stroke-dasharray="0.9 0.7"';
       c.line(P(0, 0, 0), P(L, 0, 0), '#9AA5AF', 0.15, dash);
@@ -814,6 +900,12 @@
         const z = i * fh;
         c.poly([P(0, 0, z), P(L, 0, z), P(L, D, z), P(0, D, z)], i === 0 ? 'rgba(37,48,58,0.04)' : 'none', '#C1C9D0', 0.12);
       }
+      if (showPath) {
+        // top storey layout, so the route can be read from suite to stair
+        const cr = lay.corr;
+        lay.units.forEach(u => c.poly(u.poly.map(q => P(q[0], q[1], zt)), 'none', '#A9B3BB', 0.12));
+        c.poly([P(cr.x0, cr.y0, zt), P(cr.x1, cr.y0, zt), P(cr.x1, cr.y1, zt), P(cr.x0, cr.y1, zt)], mix(p.circ, '#ffffff', 0.15), '#A9B3BB', 0.12);
+      }
       const vols = [];
       lay.cores.forEach(core => {
         if (core.stair) vols.push({ x0: core.stair.x0, x1: core.stair.x1, y0: 0, y1: rd, kind: 'stair' });
@@ -822,7 +914,9 @@
       vols.sort((a, b) => (a.x0 + a.y0) - (b.x0 + b.y0));
       vols.forEach(v => {
         const st = v.kind === 'stair';
-        const cT = st ? mix(acc, '#ffffff', 0.3) : '#EEF0F2', cY = st ? acc : '#D9DEE2', cX = st ? mix(acc, '#000000', 0.18) : '#C2CAD0';
+        // with the egress path on, the stair is drawn lighter so the loops read through it
+        const lift = st && showPath ? 0.45 : 0;
+        const cT = st ? mix(acc, '#ffffff', 0.3 + lift * 0.5) : '#EEF0F2', cY = st ? mix(acc, '#ffffff', lift) : '#D9DEE2', cX = st ? mix(mix(acc, '#000000', 0.18), '#ffffff', lift) : '#C2CAD0';
         box(v.x0, v.x1, v.y0, v.y1, 0, H, cT, cY, cX);
         const lc = st ? mix(acc, '#000000', 0.35) : '#A9B2BA';
         for (let i = 1; i < p.storeys; i++) {
@@ -830,7 +924,7 @@
           c.line(P(v.x0, v.y1, z), P(v.x1, v.y1, z), lc, 0.12);
           c.line(P(v.x1, v.y1, z), P(v.x1, v.y0, z), lc, 0.12);
         }
-        if (st) {
+        if (st && !showPath) {
           const w = v.x1 - v.x0, xa = v.x0 + w * 0.2, xb = v.x1 - w * 0.2;
           const zig = [];
           for (let s = 0; s <= p.storeys * 2; s++) zig.push(P(s % 2 ? xb : xa, rd, s * fh / 2));
@@ -846,6 +940,7 @@
         c.line(P(L, D, z), P(L, 0, z), '#AAB4BC', 0.12);
       }
       drawOverruns();
+      if (showPath) drawEgress(zt);
     } else {
       c.poly(longF, '#FFFFFF', INK, 0.25);
       c.poly(endF, '#D7DCE1', INK, 0.25);
@@ -896,6 +991,8 @@
         const bt = mix(p.balc, '#ffffff', 0.35), bs = mix(p.balc, '#000000', 0.15);
         list.forEach(b => box(b.x0, b.x1, D, D + 1.4, b.z - 0.2, b.z + 1.05, bt, p.balc, bs, 0.15));
       }
+      // egress path is drawn last, over the facades, so it always reads
+      if (showPath) { ghostStairs(); drawEgress(zt); }
     }
 
     // dimensions
@@ -1270,6 +1367,7 @@
       const s = kind === 'iso' ? `Isometric, 1:${fmtN(p.isoScale)} along the building axes` : `Floor plan, 1:${fmtN(p.planScale)}`;
       lines.push({ t: s, size: 1.9, fill: '#7A858F', gapBefore: lines.length ? 0.8 : 0 });
     }
+    lines.push({ t: AI_NOTE, size: 1.9, fill: '#7A858F', gapBefore: lines.length ? 0.5 : 0 });
     if (lines.length) y += multi && p.caption ? 3.5 : 3;
     lines.forEach(l => {
       y += (l.gapBefore || 0) + l.size * 1.1;
@@ -1456,6 +1554,8 @@
     let o = null;
     try { o = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) { o = null; }
     const src = Object.assign({}, DEFAULTS, o || {});
+    if (src.pathColor === '#2e7d50' || src.pathColor === '#2E7D50') src.pathColor = DEFAULTS.pathColor;
+    if (src.egress === undefined) src.egress = true;
     ALL_IDS.forEach(id => setVal(id, src[id]));
   }
 
