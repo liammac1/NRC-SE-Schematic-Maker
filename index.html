@@ -283,7 +283,8 @@
         <label><input type="checkbox" id="overrun"> Stair overrun</label>
         <label style="grid-column: 1 / -1;"><input type="checkbox" id="egress"> Egress path</label>
         <label><input type="checkbox" id="context"> Trees and ground</label>
-        <label><input type="checkbox" id="isoDims"> Dimensions</label>
+        <label><input type="checkbox" id="heightDim"> Height dimension</label>
+        <label><input type="checkbox" id="isoDims"> Length and depth</label>
         <label><input type="checkbox" id="storeyDim"> Storeys dimension</label>
       </div>
     </details>
@@ -431,7 +432,7 @@
   const DEFAULTS = {
     preset: 'ses4', len: 30, dep: 20, storeys: 4, fh: 3, units: 4, occ: 30, stairs: '1', flight: 1.5, cw: 1.5,
     elev: false, vest: false,
-    isoStyle: 'solid', hlabel: 'm', balc: true, overrun: true, context: true, isoDims: true, storeyDim: false,
+    isoStyle: 'solid', hlabel: 'm', balc: true, overrun: true, context: true, isoDims: true, heightDim: true, storeyDim: false,
     planLabels: true, planDoors: true, planTravel: true, planDims: true, planBar: true, unitLt25: false, deadEnd: true,
     isoScale: 1000, planScale: 500, isoFrame: 'shared', planFrame: 'fit',
     maxL: 112.5, maxD: 20, maxS: 6, dpi: '300',
@@ -536,6 +537,7 @@
       overrun: val('overrun'),
       context: val('context'),
       isoDims: val('isoDims'),
+      heightDim: val('heightDim'),
       storeyDim: val('storeyDim'),
       planLabels: val('planLabels'),
       planDoors: val('planDoors'),
@@ -999,11 +1001,11 @@
       if (showPath) { ghostStairs(); drawEgress(zt); }
     }
 
-    // dimensions
-    if (p.isoDims) {
-      const tk = 0.75;
-      const tick = q => c.line([q[0] - tk, q[1] + tk], [q[0] + tk, q[1] - tk], INK, 0.3);
-      const ext = '#8C969F';
+    // dimensions: height and length/depth switch on independently
+    const tk = 0.75;
+    const tick = q => c.line([q[0] - tk, q[1] + tk], [q[0] + tk, q[1] - tk], INK, 0.3);
+    const ext = '#8C969F';
+    if (p.heightDim) {
       // height, to the left of the long face
       const a = P(0, D, H), b = P(0, D, 0), xd = b[0] - 6;
       c.line([a[0] - 1, a[1]], [xd - 1.2, a[1]], ext, 0.12);
@@ -1018,6 +1020,8 @@
       } else {
         c.text(xd - 1.8, mid + 0.9, 2.6, p.hlabel === 'storeys' ? storeysTxt : fmtM(H), { anchor: 'end', weight: 600 });
       }
+    }
+    if (p.isoDims) {
       // length, along the long face
       const g = 5 / k;
       const la = P(0, D + g, 0), lb = P(L, D + g, 0);
@@ -1040,7 +1044,7 @@
     if (p.storeyDim) {
       const a = P(0, D, H), b = P(0, D, 0);
       let xd = b[0] - 6;
-      if (p.isoDims) {
+      if (p.heightDim) {
         const storeysTxt0 = `${p.storeys} storey${p.storeys === 1 ? '' : 's'}`;
         const labs = p.hlabel === 'both' ? [[fmtM(H), 2.6], [storeysTxt0, 2.1]] : [[p.hlabel === 'storeys' ? storeysTxt0 : fmtM(H), 2.6]];
         const lw = Math.max(...labs.map(([t, sz]) => textW(t, sz)));
