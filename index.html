@@ -353,7 +353,8 @@
         <label class="f wide"><span>Notes, one per line (blank uses building values)</span><textarea id="notes"></textarea></label>
       </div>
       <div class="checks">
-        <label><input type="checkbox" id="caption"> Show caption</label>
+        <label><input type="checkbox" id="showTitle"> Show title</label>
+        <label><input type="checkbox" id="caption"> Show notes</label>
         <label><input type="checkbox" id="scaleNote"> Show scale</label>
         <label><input type="checkbox" id="whiteBg"> White background</label>
       </div>
@@ -434,7 +435,7 @@
     planLabels: true, planDoors: true, planTravel: true, planDims: true, planBar: true, unitLt25: false, deadEnd: true,
     isoScale: 1000, planScale: 500, isoFrame: 'shared', planFrame: 'fit',
     maxL: 112.5, maxD: 20, maxS: 6, dpi: '300',
-    title: '', notes: '', caption: true, scaleNote: true, whiteBg: true,
+    title: '', notes: '', caption: true, showTitle: true, scaleNote: true, whiteBg: true,
     accent: DEFAULT_COLOURS.accent, balcColor: DEFAULT_COLOURS.balcColor, circColor: DEFAULT_COLOURS.circColor, pathColor: DEFAULT_COLOURS.pathColor, egress: true, pathStyle: 'solid',
     bOn: false, bPreset: 'two4', bLen: 112.5, bDep: 20, bStoreys: 4, bUnits: 26, bOcc: 96, bStairs: '2', bFlight: 1.1, bGap: 10, hallL: '', hallR: '', bHallL: '', bHallR: ''
   };
@@ -554,6 +555,7 @@
       title: val('title').trim(),
       notes: val('notes'),
       caption: val('caption'),
+      showTitle: val('showTitle'),
       scaleNote: val('scaleNote'),
       whiteBg: val('whiteBg'),
       accent: val('accent'),
@@ -1365,15 +1367,15 @@
     let y = m + contentH;
 
     // a short label under each building when comparing
-    if (multi && p.caption) {
+    if (multi && (p.caption || p.showTitle)) {
       let lowest = y;
       items.forEach((it, i) => {
         const bw = Math.max(slotW[i], 40);
         const ls = [];
-        wrap(autoTitle(it.p), 2.6, bw).forEach(t => ls.push({ t, size: 2.6, weight: 600, fill: INK }));
+        if (p.showTitle) wrap(autoTitle(it.p), 2.6, bw).forEach(t => ls.push({ t, size: 2.6, weight: 600, fill: INK }));
         const q = it.p;
         const stat = `${fmtN(q.L)} × ${fmtN(q.D)} m, ${q.units} units per storey${q.occ ? `, ${q.occ} occupants` : ''}`;
-        wrap(stat, 2.1, bw).forEach(t => ls.push({ t, size: 2.1, fill: '#46525D' }));
+        if (p.caption) wrap(stat, 2.1, bw).forEach(t => ls.push({ t, size: 2.1, fill: '#46525D' }));
         let yy = y + 2.5;
         ls.forEach(l => { yy += l.size * 1.1; cap.push(textLine(slotX[i], yy, l)); yy += l.size * 0.35; });
         lowest = Math.max(lowest, yy);
@@ -1382,10 +1384,12 @@
     }
 
     const lines = [];
-    if (p.caption) {
-      const maxW = W - 2 * m;
+    const maxW = W - 2 * m;
+    if (p.showTitle) {
       const title = p.title || (multi ? 'Compared at the same scale' : autoTitle(p));
       wrap(title, 3.0, maxW).forEach(t => lines.push({ t, size: 3.0, weight: 600, fill: INK }));
+    }
+    if (p.caption) {
       const notes = p.notes.trim() ? p.notes.split('\n').map(s => s.trim()).filter(Boolean) : (multi ? [] : autoNotes(p));
       notes.forEach(n => wrap(n, 2.3, maxW).forEach(t => lines.push({ t, size: 2.3, fill: '#46525D' })));
     }
@@ -1393,7 +1397,7 @@
       const s = kind === 'iso' ? `Isometric, 1:${fmtN(p.isoScale)} along the building axes` : `Floor plan, 1:${fmtN(p.planScale)}`;
       lines.push({ t: s, size: 1.9, fill: '#7A858F', gapBefore: lines.length ? 0.8 : 0 });
     }
-    if (lines.length) y += multi && p.caption ? 3.5 : 3;
+    if (lines.length) y += multi && (p.caption || p.showTitle) ? 3.5 : 3;
     lines.forEach(l => {
       y += (l.gapBefore || 0) + l.size * 1.1;
       cap.push(textLine(m, y, l));
