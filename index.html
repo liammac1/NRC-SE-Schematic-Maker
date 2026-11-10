@@ -344,12 +344,22 @@
         <label class="f"><span>Space between (mm on paper)</span><input type="number" id="bGap" min="0" max="60" step="1"></label>
       </div>
       <p class="hint" id="bHallNote"></p>
+      <div class="grid">
+        <label class="f wide"><span>Second building title (blank uses an automatic title)</span><input type="text" id="bTitle"></label>
+        <label class="f wide"><span>Second building notes, one per line</span><textarea id="bNotes"></textarea></label>
+        <label class="f wide"><span>Comparison title (blank uses “Compared at the same scale”)</span><input type="text" id="cmpTitle"></label>
+        <label class="f wide"><span>Comparison notes, one per line</span><textarea id="cmpNotes"></textarea></label>
+      </div>
+      <div class="checks">
+        <label style="grid-column: 1 / -1;"><input type="checkbox" id="cmpTitleOn"> Show comparison title</label>
+      </div>
       <p class="hint"><button type="button" class="linkbtn" id="swapAB">Swap the two buildings</button></p>
     </details>
 
     <details>
       <summary>Caption</summary>
       <div class="grid">
+        <p class="hint f wide" style="margin:0">With a second building, the title and notes here label the first building, and blank notes show nothing.</p>
         <label class="f wide"><span>Title (blank uses an automatic title)</span><input type="text" id="title"></label>
         <label class="f wide"><span>Notes, one per line (blank uses building values)</span><textarea id="notes"></textarea></label>
       </div>
@@ -438,7 +448,7 @@
     maxL: 112.5, maxD: 20, maxS: 6, dpi: '300',
     title: '', notes: '', caption: true, showTitle: true, scaleNote: true, whiteBg: true,
     accent: DEFAULT_COLOURS.accent, balcColor: DEFAULT_COLOURS.balcColor, circColor: DEFAULT_COLOURS.circColor, pathColor: DEFAULT_COLOURS.pathColor, egress: true, pathStyle: 'solid',
-    bOn: false, bPreset: 'two4', bLen: 112.5, bDep: 20, bStoreys: 4, bUnits: 26, bOcc: 96, bStairs: '2', bFlight: 1.1, bGap: 10, hallL: '', hallR: '', bHallL: '', bHallR: ''
+    bOn: false, bPreset: 'two4', bLen: 112.5, bDep: 20, bStoreys: 4, bUnits: 26, bOcc: 96, bStairs: '2', bFlight: 1.1, bGap: 10, hallL: '', hallR: '', bHallL: '', bHallR: '', bTitle: '', bNotes: '', cmpTitle: '', cmpNotes: '', cmpTitleOn: true
   };
   const B_FIELDS = ['bLen', 'bDep', 'bStoreys', 'bUnits', 'bOcc', 'bStairs', 'bFlight', 'bHallL', 'bHallR'];
   const B_MAP = { len: 'bLen', dep: 'bDep', storeys: 'bStoreys', units: 'bUnits', occ: 'bOcc', stairs: 'bStairs', flight: 'bFlight', hallL: 'bHallL', hallR: 'bHallR' };
@@ -558,6 +568,11 @@
       notes: val('notes'),
       caption: val('caption'),
       showTitle: val('showTitle'),
+      bTitle: val('bTitle').trim(),
+      bNotes: val('bNotes'),
+      cmpTitle: val('cmpTitle').trim(),
+      cmpNotes: val('cmpNotes'),
+      cmpTitleOn: val('cmpTitleOn'),
       scaleNote: val('scaleNote'),
       whiteBg: val('whiteBg'),
       accent: val('accent'),
@@ -1376,10 +1391,10 @@
       items.forEach((it, i) => {
         const bw = Math.max(slotW[i], 40);
         const ls = [];
-        if (p.showTitle) wrap(autoTitle(it.p), 2.6, bw).forEach(t => ls.push({ t, size: 2.6, weight: 600, fill: INK }));
-        const q = it.p;
-        const stat = `${fmtN(q.L)} × ${fmtN(q.D)} m, ${q.units} units per storey${q.occ ? `, ${q.occ} occupants` : ''}`;
-        if (p.caption) wrap(stat, 2.1, bw).forEach(t => ls.push({ t, size: 2.1, fill: '#46525D' }));
+        if (p.showTitle) wrap(it.title || autoTitle(it.p), 2.6, bw).forEach(t => ls.push({ t, size: 2.6, weight: 600, fill: INK }));
+        // in a comparison, notes appear only when typed in; no automatic size line
+        const own = (it.notes || '').trim() ? it.notes.split('\n').map(x => x.trim()).filter(Boolean) : [];
+        if (p.caption) own.forEach(n => wrap(n, 2.1, bw).forEach(t => ls.push({ t, size: 2.1, fill: '#46525D' })));
         let yy = y + 2.5;
         ls.forEach(l => { yy += l.size * 1.1; cap.push(textLine(slotX[i], yy, l)); yy += l.size * 0.35; });
         lowest = Math.max(lowest, yy);
@@ -1389,12 +1404,13 @@
 
     const lines = [];
     const maxW = W - 2 * m;
-    if (p.showTitle) {
-      const title = p.title || (multi ? 'Compared at the same scale' : autoTitle(p));
+    if (p.showTitle && (!multi || p.cmpTitleOn)) {
+      const title = multi ? (p.cmpTitle || 'Compared at the same scale') : (p.title || autoTitle(p));
       wrap(title, 3.0, maxW).forEach(t => lines.push({ t, size: 3.0, weight: 600, fill: INK }));
     }
     if (p.caption) {
-      const notes = p.notes.trim() ? p.notes.split('\n').map(s => s.trim()).filter(Boolean) : (multi ? [] : autoNotes(p));
+      const src = multi ? p.cmpNotes : p.notes;
+      const notes = src.trim() ? src.split('\n').map(s => s.trim()).filter(Boolean) : (multi ? [] : autoNotes(p));
       notes.forEach(n => wrap(n, 2.3, maxW).forEach(t => lines.push({ t, size: 2.3, fill: '#46525D' })));
     }
     if (p.scaleNote) {
@@ -1430,10 +1446,11 @@
     const maxP = Object.assign({}, p, { L: p.maxL, D: p.maxD, storeys: p.maxS });
 
     const isoMax = p.isoFrame === 'shared' ? isoScene(maxP, layout(maxP)) : null;
-    outputs.iso = compose(builds.map((q, i) => ({ p: q, scene: isoScene(q, lays[i]) })), isoMax, 'iso', p);
+    const capOf = i => i === 0 ? { title: p.title, notes: p.notes } : { title: p.bTitle, notes: p.bNotes };
+    outputs.iso = compose(builds.map((q, i) => Object.assign({ p: q, scene: isoScene(q, lays[i]) }, capOf(i))), isoMax, 'iso', p);
 
     const planMax = p.planFrame === 'shared' ? planScene(maxP, layout(maxP), 'plan') : null;
-    outputs.plan = compose(builds.map((q, i) => ({ p: q, scene: planScene(q, lays[i], 'plan') })), planMax, 'plan', p);
+    outputs.plan = compose(builds.map((q, i) => Object.assign({ p: q, scene: planScene(q, lays[i], 'plan') }, capOf(i))), planMax, 'plan', p);
 
     show('iso', outputs.iso, p.isoScale, p.isoFrame);
     show('plan', outputs.plan, p.planScale, p.planFrame);
@@ -1631,6 +1648,7 @@
     Object.keys(B_MAP).forEach(id => { a[id] = val(id); b[id] = val(B_MAP[id]); });
     Object.keys(B_MAP).forEach(id => { setVal(id, b[id]); setVal(B_MAP[id], a[id]); });
     const pa = presetSel.value; presetSel.value = bPresetSel.value; bPresetSel.value = pa;
+    [['title', 'bTitle'], ['notes', 'bNotes']].forEach(([x, y]) => { const t = val(x); setVal(x, val(y)); setVal(y, t); });
     render();
   });
 
