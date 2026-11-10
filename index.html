@@ -431,7 +431,7 @@
 
   const DEFAULTS = {
     preset: 'ses4', len: 30, dep: 20, storeys: 4, fh: 3, units: 4, occ: 30, stairs: '1', flight: 1.5, cw: 1.5,
-    elev: true, vest: false,
+    elev: false, vest: false,
     isoStyle: 'solid', hlabel: 'm', balc: true, overrun: true, context: true, isoDims: true,
     planLabels: true, planDoors: true, planTravel: true, planDims: true, planBar: true, unitLt25: false, deadEnd: true,
     isoScale: 1000, planScale: 500, isoFrame: 'shared', planFrame: 'fit',
@@ -1550,6 +1550,7 @@
     try {
       const o = {};
       ALL_IDS.forEach(id => { o[id] = val(id); });
+      o.elevDefaultV2 = true;
       localStorage.setItem(STORE_KEY, JSON.stringify(o));
     } catch (e) { /* storage unavailable: keep working in memory */ }
   }
@@ -1559,6 +1560,8 @@
     const src = Object.assign({}, DEFAULTS, o || {});
     if (src.pathColor === '#2e7d50' || src.pathColor === '#2E7D50') src.pathColor = DEFAULTS.pathColor;
     if (src.egress === undefined) src.egress = true;
+    // settings saved before elevators defaulted to off: switch them off once
+    if (o && !o.elevDefaultV2) src.elev = false;
     ALL_IDS.forEach(id => setVal(id, src[id]));
   }
 
