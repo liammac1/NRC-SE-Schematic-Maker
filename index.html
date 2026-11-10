@@ -350,7 +350,6 @@
       <div class="grid">
         <label class="f wide"><span>Title (blank uses an automatic title)</span><input type="text" id="title"></label>
         <label class="f wide"><span>Notes, one per line (blank uses building values)</span><textarea id="notes"></textarea></label>
-        <p class="hint f wide" style="margin:0">Always included and cannot be removed: “Drawing created with AI assistance.”</p>
       </div>
       <div class="checks">
         <label><input type="checkbox" id="caption"> Show caption</label>
@@ -415,8 +414,6 @@
   const fmtM = v => (Math.round(v * 10) / 10).toFixed(1) + '\u202Fm';
   const fmtN = v => String(+(+v).toFixed(1));
 
-  // Transparency note: always printed on every drawing and cannot be switched off
-  const AI_NOTE = 'Drawing created with AI assistance.';
   const DEFAULT_COLOURS = { accent: '#E2582A', balcColor: '#F0B53A', circColor: '#DCEBD6', pathColor: '#0A8A3F' };
 
   /* ---------------- presets (TG-SE-RA archetypes, Table 7) ---------------- */
@@ -1370,7 +1367,6 @@
       const s = kind === 'iso' ? `Isometric, 1:${fmtN(p.isoScale)} along the building axes` : `Floor plan, 1:${fmtN(p.planScale)}`;
       lines.push({ t: s, size: 1.9, fill: '#7A858F', gapBefore: lines.length ? 0.8 : 0 });
     }
-    lines.push({ t: AI_NOTE, size: 1.9, fill: '#7A858F', gapBefore: lines.length ? 0.5 : 0 });
     if (lines.length) y += multi && p.caption ? 3.5 : 3;
     lines.forEach(l => {
       y += (l.gapBefore || 0) + l.size * 1.1;
