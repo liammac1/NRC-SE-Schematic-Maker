@@ -67,7 +67,7 @@
   .side {
     background: var(--panel);
     border-right: 1px solid var(--line);
-    padding: 22px 20px 40px;
+    padding: 20px 20px 40px;
     overflow-y: auto;
     max-height: 100vh;
     position: sticky;
@@ -84,8 +84,6 @@
     color: var(--muted);
     font-size: 13px;
   }
-  .preset-row { margin-bottom: 14px; }
-  .preset-row label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
 
   details {
     border-top: 1px solid var(--line);
@@ -151,6 +149,43 @@
     background: none; border: none; color: var(--ui); font: inherit; font-size: 13px; padding: 0; cursor: pointer;
     text-decoration: underline; text-underline-offset: 2px;
   }
+
+
+  /* ---------- Sidebar structure ---------- */
+  .card { border-top: 1px solid var(--line); padding: 14px 0 6px; }
+  .tabs {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 3px;
+    background: var(--field); border: 1px solid var(--line); border-radius: 7px; padding: 3px;
+    margin-bottom: 12px;
+  }
+  .tabs button {
+    font: inherit; font-size: 13.5px; font-weight: 500; color: var(--muted);
+    background: transparent; border: none; border-radius: 5px; padding: 6px 8px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .tabs button[aria-selected="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(20,30,40,.12); }
+  .tabs button:focus-visible { outline: 2px solid var(--ui); outline-offset: 1px; }
+  .pill { font-size: 11px; font-weight: 500; padding: 0 6px; border-radius: 9px; background: var(--line); color: var(--muted); line-height: 17px; }
+  .pill.on { background: var(--ui); color: var(--panel); }
+  .sub { font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 16px 0 0; letter-spacing: 0; }
+  .sub + .grid, .sub + .list { margin-top: 7px; }
+  .f.top { margin-top: 2px; }
+  .f.wide { margin-top: 8px; }
+  .grid.three { grid-template-columns: 1fr 1fr 1fr; }
+  .list { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+  .row { display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; padding: 3px 0; }
+  .row input { accent-color: var(--ui); width: 15px; height: 15px; margin: 0; flex: none; }
+  .row.strong { font-weight: 500; }
+  .indent { margin: 0 0 4px 23px; }
+  .indent .hint { margin: 0 0 2px; }
+  .f.inline { flex-direction: row; align-items: center; gap: 8px; }
+  .f.inline > span { flex: none; }
+  .f.inline select { width: auto; padding: 4px 6px; font-size: 13px; }
+  .sum-note { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 6px; margin-right: auto; }
+  .swatches { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-top: 10px; }
+  .swatches label { display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; }
+  .swatches input[type="color"] { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: none; cursor: pointer; flex: none; }
+  [hidden] { display: none !important; }
 
   /* ---------- Sheets ---------- */
   main {
@@ -235,74 +270,135 @@
   <aside class="side">
     <div class="brand">
       <h1>Single egress schematics</h1>
-      <p>Isometrics and floor plans drawn at a fixed print scale, so every export sits side by side in the report at true relative size.</p>
+      <p>Isometrics and floor plans at a fixed print scale.</p>
     </div>
 
-    <div class="preset-row">
-      <label for="preset">Start from</label>
-      <select id="preset"></select>
-    </div>
-
-    <details open>
-      <summary>Building</summary>
-      <div class="grid">
-        <label class="f"><span>Length (m)</span><input type="number" id="len" min="6" max="250" step="0.5"></label>
-        <label class="f"><span>Depth (m)</span><input type="number" id="dep" min="8" max="60" step="0.5"></label>
-        <label class="f"><span>Storeys</span><input type="number" id="storeys" min="1" max="120" step="1"></label>
-        <label class="f"><span>Floor to floor (m)</span><input type="number" id="fh" min="2.4" max="6" step="0.1"></label>
-        <label class="f"><span>Units per storey</span><input type="number" id="units" min="2" max="40" step="1"></label>
-        <label class="f"><span>Occupants per storey</span><input type="number" id="occ" min="0" max="400" step="1"></label>
-        <label class="f"><span>Exit stairs</span>
-          <select id="stairs"><option value="1">One (single egress)</option><option value="2">Two</option></select></label>
-        <label class="f"><span>Stair width (m)</span><input type="number" id="flight" min="0.9" max="2" step="0.05"></label>
-        <label class="f"><span>Corridor width (m)</span><input type="number" id="cw" min="0.9" max="4" step="0.1"></label>
-        <span></span>
-        <label class="f"><span>Hallway past stair, left (m)</span><input type="number" id="hallL" min="0" max="120" step="0.5" placeholder="Auto"></label>
-        <label class="f"><span>Hallway past stair, right (m)</span><input type="number" id="hallR" min="0" max="120" step="0.5" placeholder="Auto"></label>
+    <!-- Buildings: one tab per building, everything specific to that building lives inside it -->
+    <section class="card">
+      <div class="tabs" role="tablist" aria-label="Buildings">
+        <button type="button" role="tab" id="tabA" aria-selected="true" aria-controls="panelA">Building 1</button>
+        <button type="button" role="tab" id="tabB" aria-selected="false" aria-controls="panelB">Building 2 <span class="pill" id="bPill">Off</span></button>
       </div>
-      <p class="hint" id="hallNote"></p>
-      <div class="checks">
-        <label><input type="checkbox" id="elev"> Elevator</label>
-        <label><input type="checkbox" id="vest"> Stair vestibule</label>
-        <label style="grid-column: 1 / -1;"><input type="checkbox" id="deadEnd"> Limit dead-end corridors to 6 m</label>
+
+      <div id="panelA" role="tabpanel" aria-labelledby="tabA">
+        <label class="f wide top"><span>Start from</span><select id="preset"></select></label>
+
+        <h3 class="sub">Size</h3>
+        <div class="grid">
+          <label class="f"><span>Length (m)</span><input type="number" id="len" min="6" max="250" step="0.5"></label>
+          <label class="f"><span>Depth (m)</span><input type="number" id="dep" min="8" max="60" step="0.5"></label>
+          <label class="f"><span>Storeys</span><input type="number" id="storeys" min="1" max="120" step="1"></label>
+          <label class="f"><span>Units per storey</span><input type="number" id="units" min="2" max="40" step="1"></label>
+          <label class="f"><span>Occupants per storey</span><input type="number" id="occ" min="0" max="400" step="1"></label>
+        </div>
+
+        <h3 class="sub">Exits</h3>
+        <div class="grid">
+          <label class="f"><span>Exit stairs</span>
+            <select id="stairs"><option value="1">One</option><option value="2">Two</option></select></label>
+          <label class="f"><span>Stair width (m)</span><input type="number" id="flight" min="0.9" max="2" step="0.05"></label>
+          <label class="f"><span>Hallway left (m)</span><input type="number" id="hallL" min="0" max="120" step="0.5" placeholder="Auto"></label>
+          <label class="f"><span>Hallway right (m)</span><input type="number" id="hallR" min="0" max="120" step="0.5" placeholder="Auto"></label>
+        </div>
+        <p class="hint" id="hallNote"></p>
+
+        <h3 class="sub">Caption</h3>
+        <label class="f wide"><span>Title</span><input type="text" id="title" placeholder="Automatic"></label>
+        <label class="row"><input type="checkbox" id="showTitle"> Show title</label>
+        <label class="f wide"><span>Notes, one per line</span><textarea id="notes" rows="3" placeholder="Blank shows the building values"></textarea></label>
+      </div>
+
+      <div id="panelB" role="tabpanel" aria-labelledby="tabB" hidden>
+        <label class="row strong"><input type="checkbox" id="bOn"> Draw a second building to the right</label>
+        <div data-needs="bOn">
+          <label class="f wide top"><span>Start from</span><select id="bPreset"></select></label>
+
+          <h3 class="sub">Size</h3>
+          <div class="grid">
+            <label class="f"><span>Length (m)</span><input type="number" id="bLen" min="6" max="250" step="0.5"></label>
+            <label class="f"><span>Depth (m)</span><input type="number" id="bDep" min="8" max="60" step="0.5"></label>
+            <label class="f"><span>Storeys</span><input type="number" id="bStoreys" min="1" max="120" step="1"></label>
+            <label class="f"><span>Units per storey</span><input type="number" id="bUnits" min="2" max="40" step="1"></label>
+            <label class="f"><span>Occupants per storey</span><input type="number" id="bOcc" min="0" max="400" step="1"></label>
+            <label class="f"><span>Gap on paper (mm)</span><input type="number" id="bGap" min="0" max="60" step="1"></label>
+          </div>
+
+          <h3 class="sub">Exits</h3>
+          <div class="grid">
+            <label class="f"><span>Exit stairs</span>
+              <select id="bStairs"><option value="1">One</option><option value="2">Two</option></select></label>
+            <label class="f"><span>Stair width (m)</span><input type="number" id="bFlight" min="0.9" max="2" step="0.05"></label>
+            <label class="f"><span>Hallway left (m)</span><input type="number" id="bHallL" min="0" max="120" step="0.5" placeholder="Auto"></label>
+            <label class="f"><span>Hallway right (m)</span><input type="number" id="bHallR" min="0" max="120" step="0.5" placeholder="Auto"></label>
+          </div>
+          <p class="hint" id="bHallNote"></p>
+
+          <h3 class="sub">Caption</h3>
+          <label class="f wide"><span>Title</span><input type="text" id="bTitle" placeholder="Automatic"></label>
+          <label class="row"><input type="checkbox" id="bTitleOn"> Show title</label>
+          <label class="f wide"><span>Notes, one per line</span><textarea id="bNotes" rows="3" placeholder="Blank shows no notes"></textarea></label>
+
+          <p class="hint"><button type="button" class="linkbtn" id="swapAB">Swap buildings 1 and 2</button></p>
+        </div>
+      </div>
+    </section>
+
+    <details>
+      <summary>Layout rules <span class="sum-note">both buildings</span></summary>
+      <div class="grid">
+        <label class="f"><span>Floor to floor (m)</span><input type="number" id="fh" min="2.4" max="6" step="0.1"></label>
+        <label class="f"><span>Corridor width (m)</span><input type="number" id="cw" min="0.9" max="4" step="0.1"></label>
+      </div>
+      <div class="list">
+        <label class="row"><input type="checkbox" id="elev"> Elevator</label>
+        <label class="row"><input type="checkbox" id="vest"> Stair vestibule</label>
+        <label class="row"><input type="checkbox" id="deadEnd"> Limit dead-end corridors to 6 m</label>
       </div>
     </details>
 
     <details open>
       <summary>Isometric</summary>
-      <div class="grid">
-        <label class="f"><span>Style</span>
-          <select id="isoStyle"><option value="solid">Solid massing</option><option value="xray">See-through core</option></select></label>
-        <label class="f"><span>Egress line</span>
-          <select id="pathStyle"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></label>
-        <label class="f"><span>Height label</span>
-          <select id="hlabel"><option value="m">Metres</option><option value="storeys">Storeys</option><option value="both">Both</option></select></label>
+      <label class="f wide top"><span>Style</span>
+        <select id="isoStyle"><option value="solid">Solid massing</option><option value="xray">See-through core</option></select></label>
+      <h3 class="sub">Show</h3>
+      <div class="list">
+        <label class="row"><input type="checkbox" id="egress"> Egress path</label>
+        <div class="indent" id="pathStyleRow">
+          <label class="f inline"><span>Line</span>
+            <select id="pathStyle"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></label>
+        </div>
+        <label class="row"><input type="checkbox" id="balc"> Balconies</label>
+        <label class="row"><input type="checkbox" id="overrun"> Stair overrun</label>
+        <label class="row"><input type="checkbox" id="context"> Trees and ground</label>
       </div>
-      <div class="checks">
-        <label><input type="checkbox" id="balc"> Balconies</label>
-        <label><input type="checkbox" id="overrun"> Stair overrun</label>
-        <label style="grid-column: 1 / -1;"><input type="checkbox" id="egress"> Egress path</label>
-        <label><input type="checkbox" id="context"> Trees and ground</label>
-        <label><input type="checkbox" id="heightDim"> Height dimension</label>
-        <label><input type="checkbox" id="isoDims"> Length and depth</label>
-        <label><input type="checkbox" id="storeyDim"> Storeys dimension</label>
+      <h3 class="sub">Dimensions</h3>
+      <div class="list">
+        <label class="row"><input type="checkbox" id="heightDim"> Height</label>
+        <div class="indent" id="hlabelRow">
+          <label class="f inline"><span>Label</span>
+            <select id="hlabel"><option value="m">Metres</option><option value="storeys">Storeys</option><option value="both">Both</option></select></label>
+        </div>
+        <label class="row"><input type="checkbox" id="isoDims"> Length and depth</label>
+        <label class="row"><input type="checkbox" id="storeyDim"> Storey count</label>
       </div>
     </details>
 
     <details>
       <summary>Floor plan</summary>
-      <div class="checks">
-        <label><input type="checkbox" id="planLabels"> Unit labels</label>
-        <label><input type="checkbox" id="planDoors"> Door swings</label>
-        <label><input type="checkbox" id="planTravel"> Travel distances</label>
-        <label style="grid-column: 1 / -1;"><input type="checkbox" id="unitLt25"> Show in-unit travel as &lt;25 m (single exit stair)</label>
-        <label><input type="checkbox" id="planDims"> Dimensions</label>
-        <label><input type="checkbox" id="planBar"> Scale bar</label>
+      <div class="list">
+        <label class="row"><input type="checkbox" id="planLabels"> Unit labels</label>
+        <label class="row"><input type="checkbox" id="planDoors"> Door swings</label>
+        <label class="row"><input type="checkbox" id="planTravel"> Travel distances</label>
+        <div class="indent" id="lt25Row">
+          <label class="row"><input type="checkbox" id="unitLt25"> Show in-unit runs as &lt;25 m</label>
+          <p class="hint">Single exit stair only. Suites over 25 m keep their real distance.</p>
+        </div>
+        <label class="row"><input type="checkbox" id="planDims"> Dimensions</label>
+        <label class="row"><input type="checkbox" id="planBar"> Scale bar</label>
       </div>
-      <p class="hint">Travel lines run from each suite door to its farthest corner. Along the corridor they show each dead end (stair door to hallway end) and, with two stairs, the longest run between them. With the &lt;25 m option on, any suite measuring over 25 m still shows its real distance.</p>
     </details>
 
-    <details open>
+    <details>
       <summary>Scale and frame</summary>
       <div class="grid">
         <label class="f"><span>Isometric scale</span><span class="ratio"><b>1 :</b><input type="number" id="isoScale" min="50" max="5000" step="50"></span></label>
@@ -312,68 +408,35 @@
         <label class="f"><span>Plan frame</span>
           <select id="planFrame"><option value="shared">Shared size</option><option value="fit">Fit drawing</option></select></label>
       </div>
-      <p class="hint">A shared frame is sized for the largest building below, so every export has identical dimensions and the same ground line.</p>
-      <div class="grid">
-        <label class="f"><span>Largest length (m)</span><input type="number" id="maxL" min="6" max="250" step="0.5"></label>
-        <label class="f"><span>Largest depth (m)</span><input type="number" id="maxD" min="8" max="60" step="0.5"></label>
-        <label class="f"><span>Most storeys</span><input type="number" id="maxS" min="1" max="120" step="1"></label>
-        <label class="f"><span>PNG resolution</span>
-          <select id="dpi"><option value="200">200 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option></select></label>
+      <div id="sharedFrame">
+        <h3 class="sub">Shared frame fits</h3>
+        <div class="grid three">
+          <label class="f"><span>Length (m)</span><input type="number" id="maxL" min="6" max="250" step="0.5"></label>
+          <label class="f"><span>Depth (m)</span><input type="number" id="maxD" min="8" max="60" step="0.5"></label>
+          <label class="f"><span>Storeys</span><input type="number" id="maxS" min="1" max="120" step="1"></label>
+        </div>
+        <p class="hint">Every export gets the same size and ground line. <button type="button" class="linkbtn" id="fitPresets">Fit all six archetypes</button></p>
       </div>
-      <p class="hint"><button type="button" class="linkbtn" id="fitPresets">Size the frame for all six archetypes</button></p>
-    </details>
-
-    <details open>
-      <summary>Second building</summary>
-      <div class="checks">
-        <label style="grid-column: 1 / -1;"><input type="checkbox" id="bOn"> Draw a second building to the right</label>
-      </div>
-      <p class="hint">Both buildings use the same scale, ground line and drawing settings, so their sizes compare directly.</p>
-      <div class="grid">
-        <label class="f wide"><span>Start from</span><select id="bPreset"></select></label>
-        <label class="f"><span>Length (m)</span><input type="number" id="bLen" min="6" max="250" step="0.5"></label>
-        <label class="f"><span>Depth (m)</span><input type="number" id="bDep" min="8" max="60" step="0.5"></label>
-        <label class="f"><span>Storeys</span><input type="number" id="bStoreys" min="1" max="120" step="1"></label>
-        <label class="f"><span>Units per storey</span><input type="number" id="bUnits" min="2" max="40" step="1"></label>
-        <label class="f"><span>Occupants per storey</span><input type="number" id="bOcc" min="0" max="400" step="1"></label>
-        <label class="f"><span>Exit stairs</span>
-          <select id="bStairs"><option value="1">One (single egress)</option><option value="2">Two</option></select></label>
-        <label class="f"><span>Stair width (m)</span><input type="number" id="bFlight" min="0.9" max="2" step="0.05"></label>
-        <label class="f"><span>Hallway past stair, left (m)</span><input type="number" id="bHallL" min="0" max="120" step="0.5" placeholder="Auto"></label>
-        <label class="f"><span>Hallway past stair, right (m)</span><input type="number" id="bHallR" min="0" max="120" step="0.5" placeholder="Auto"></label>
-        <label class="f"><span>Space between (mm on paper)</span><input type="number" id="bGap" min="0" max="60" step="1"></label>
-      </div>
-      <p class="hint" id="bHallNote"></p>
-      <div class="grid">
-        <label class="f wide"><span>Second building title (blank uses an automatic title)</span><input type="text" id="bTitle"></label>
-        <label class="f wide" style="flex-direction:row;align-items:center;gap:7px;font-size:13.5px;cursor:pointer"><input type="checkbox" id="bTitleOn" style="accent-color:var(--ui);width:15px;height:15px;margin:0"> Show second building title</label>
-        <label class="f wide"><span>Second building notes, one per line</span><textarea id="bNotes"></textarea></label>
-      </div>
-      <p class="hint"><button type="button" class="linkbtn" id="swapAB">Swap the two buildings</button></p>
     </details>
 
     <details>
-      <summary>Caption</summary>
-      <div class="grid">
-        <p class="hint f wide" style="margin:0">With a second building, the title, notes and Show title setting here apply to the first building only, and blank notes show nothing. The second building has its own under Second building.</p>
-        <label class="f wide"><span>Title (blank uses an automatic title)</span><input type="text" id="title"></label>
-        <label class="f wide"><span>Notes, one per line (blank uses building values)</span><textarea id="notes"></textarea></label>
-      </div>
-      <div class="checks">
-        <label><input type="checkbox" id="showTitle"> Show title</label>
-        <label><input type="checkbox" id="caption"> Show notes</label>
-        <label><input type="checkbox" id="scaleNote"> Show scale</label>
-        <label><input type="checkbox" id="whiteBg"> White background</label>
+      <summary>Export</summary>
+      <label class="f wide top"><span>PNG resolution</span>
+        <select id="dpi"><option value="200">200 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option></select></label>
+      <div class="list">
+        <label class="row"><input type="checkbox" id="caption"> Show notes</label>
+        <label class="row"><input type="checkbox" id="scaleNote"> Show scale line</label>
+        <label class="row"><input type="checkbox" id="whiteBg"> White background</label>
       </div>
     </details>
 
     <details>
       <summary>Colour</summary>
-      <div class="grid">
-        <label class="f"><span>Exit stair</span><span class="colour"><input type="color" id="accent"></span></label>
-        <label class="f"><span>Balconies</span><span class="colour"><input type="color" id="balcColor"></span></label>
-        <label class="f"><span>Egress path</span><span class="colour"><input type="color" id="pathColor"></span></label>
-        <label class="f"><span>Corridor</span><span class="colour"><input type="color" id="circColor"></span></label>
+      <div class="swatches">
+        <label><input type="color" id="accent"><span>Exit stair</span></label>
+        <label><input type="color" id="pathColor"><span>Egress path</span></label>
+        <label><input type="color" id="balcColor"><span>Balconies</span></label>
+        <label><input type="color" id="circColor"><span>Corridor</span></label>
       </div>
       <p class="hint"><button type="button" class="linkbtn" id="resetColours">Reset colours</button></p>
     </details>
@@ -1427,9 +1490,35 @@
     return { W, H, warn, make, multi };
   }
 
+
+  /* ---------------- sidebar: building tabs and dependent controls ---------------- */
+  function selectTab(which) {
+    const a = which === 'a';
+    $('tabA').setAttribute('aria-selected', String(a));
+    $('tabB').setAttribute('aria-selected', String(!a));
+    $('panelA').hidden = !a;
+    $('panelB').hidden = a;
+  }
+  $('tabA').addEventListener('click', () => selectTab('a'));
+  $('tabB').addEventListener('click', () => selectTab('b'));
+  [['tabA', 'tabB'], ['tabB', 'tabA']].forEach(([x, y]) => $(x).addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); $(y).click(); $(y).focus(); }
+  }));
+  function syncUI() {
+    const on = $('bOn').checked;
+    document.querySelectorAll('[data-needs="bOn"]').forEach(el => { el.hidden = !on; });
+    $('bPill').textContent = on ? 'On' : 'Off';
+    $('bPill').classList.toggle('on', on);
+    $('pathStyleRow').hidden = !$('egress').checked;
+    $('hlabelRow').hidden = !$('heightDim').checked;
+    $('lt25Row').hidden = !$('planTravel').checked;
+    $('sharedFrame').hidden = !($('isoFrame').value === 'shared' || $('planFrame').value === 'shared');
+  }
+
   /* ---------------- render ---------------- */
   const outputs = {};
   function render() {
+    syncUI();
     const p = readParams();
     save();
     const builds = [p];
