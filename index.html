@@ -248,7 +248,7 @@
       <div class="grid">
         <label class="f"><span>Length (m)</span><input type="number" id="len" min="6" max="250" step="0.5"></label>
         <label class="f"><span>Depth (m)</span><input type="number" id="dep" min="8" max="60" step="0.5"></label>
-        <label class="f"><span>Storeys</span><input type="number" id="storeys" min="1" max="16" step="1"></label>
+        <label class="f"><span>Storeys</span><input type="number" id="storeys" min="1" max="120" step="1"></label>
         <label class="f"><span>Floor to floor (m)</span><input type="number" id="fh" min="2.4" max="6" step="0.1"></label>
         <label class="f"><span>Units per storey</span><input type="number" id="units" min="2" max="40" step="1"></label>
         <label class="f"><span>Occupants per storey</span><input type="number" id="occ" min="0" max="400" step="1"></label>
@@ -316,7 +316,7 @@
       <div class="grid">
         <label class="f"><span>Largest length (m)</span><input type="number" id="maxL" min="6" max="250" step="0.5"></label>
         <label class="f"><span>Largest depth (m)</span><input type="number" id="maxD" min="8" max="60" step="0.5"></label>
-        <label class="f"><span>Most storeys</span><input type="number" id="maxS" min="1" max="16" step="1"></label>
+        <label class="f"><span>Most storeys</span><input type="number" id="maxS" min="1" max="120" step="1"></label>
         <label class="f"><span>PNG resolution</span>
           <select id="dpi"><option value="200">200 dpi</option><option value="300">300 dpi</option><option value="600">600 dpi</option></select></label>
       </div>
@@ -333,7 +333,7 @@
         <label class="f wide"><span>Start from</span><select id="bPreset"></select></label>
         <label class="f"><span>Length (m)</span><input type="number" id="bLen" min="6" max="250" step="0.5"></label>
         <label class="f"><span>Depth (m)</span><input type="number" id="bDep" min="8" max="60" step="0.5"></label>
-        <label class="f"><span>Storeys</span><input type="number" id="bStoreys" min="1" max="16" step="1"></label>
+        <label class="f"><span>Storeys</span><input type="number" id="bStoreys" min="1" max="120" step="1"></label>
         <label class="f"><span>Units per storey</span><input type="number" id="bUnits" min="2" max="40" step="1"></label>
         <label class="f"><span>Occupants per storey</span><input type="number" id="bOcc" min="0" max="400" step="1"></label>
         <label class="f"><span>Exit stairs</span>
@@ -526,7 +526,7 @@
     return {
       L: clamp(num('len', 30), 6, 250),
       D: clamp(num('dep', 20), 8, 60),
-      storeys: Math.round(clamp(num('storeys', 4), 1, 16)),
+      storeys: Math.round(clamp(num('storeys', 4), 1, 120)),
       fh: clamp(num('fh', 3), 2.4, 6),
       units: Math.round(clamp(num('units', 4), 2, 40)),
       occ: Math.round(clamp(num('occ', 0), 0, 400)),
@@ -558,7 +558,7 @@
       planFrame: val('planFrame'),
       maxL: clamp(num('maxL', 112.5), 6, 250),
       maxD: clamp(num('maxD', 20), 8, 60),
-      maxS: Math.round(clamp(num('maxS', 6), 1, 16)),
+      maxS: Math.round(clamp(num('maxS', 6), 1, 120)),
       dpi: parseInt(val('dpi'), 10) || 300,
       title: val('title').trim(),
       notes: val('notes'),
@@ -586,7 +586,7 @@
     return Object.assign({}, p, {
       L: clamp(num('bLen', 30), 6, 250),
       D: clamp(num('bDep', 20), 8, 60),
-      storeys: Math.round(clamp(num('bStoreys', 4), 1, 16)),
+      storeys: Math.round(clamp(num('bStoreys', 4), 1, 120)),
       units: Math.round(clamp(num('bUnits', 4), 2, 40)),
       occ: Math.round(clamp(num('bOcc', 0), 0, 400)),
       stairs: parseInt(val('bStairs'), 10) === 2 ? 2 : 1,
@@ -804,7 +804,7 @@
     if (p.context) {
       const g = 4;
       c.poly([P(-g, -g, 0), P(L + g, -g, 0), P(L + g, D + g, 0), P(-g, D + g, 0)], '#EDF0EA');
-      const vx = H * 0.5, vy = -H * 0.22;
+      const sh = Math.min(H, 24), vx = sh * 0.5, vy = -sh * 0.22;   // capped so tall towers do not cast a page-wide shadow
       c.poly([P(0, 0, 0), P(vx, vy, 0), P(L + vx, vy, 0), P(L + vx, D + vy, 0), P(L, D, 0), P(0, D, 0)], 'rgba(37,48,58,0.09)');
       tree(L + 4, -8, 3.4);
       tree(L + 10, -2, 2.7);
