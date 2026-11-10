@@ -284,6 +284,7 @@
         <label style="grid-column: 1 / -1;"><input type="checkbox" id="egress"> Egress path</label>
         <label><input type="checkbox" id="context"> Trees and ground</label>
         <label><input type="checkbox" id="isoDims"> Dimensions</label>
+        <label><input type="checkbox" id="storeyDim"> Storeys dimension</label>
       </div>
     </details>
 
@@ -429,7 +430,7 @@
   const DEFAULTS = {
     preset: 'ses4', len: 30, dep: 20, storeys: 4, fh: 3, units: 4, occ: 30, stairs: '1', flight: 1.5, cw: 1.5,
     elev: false, vest: false,
-    isoStyle: 'solid', hlabel: 'm', balc: true, overrun: true, context: true, isoDims: true,
+    isoStyle: 'solid', hlabel: 'm', balc: true, overrun: true, context: true, isoDims: true, storeyDim: false,
     planLabels: true, planDoors: true, planTravel: true, planDims: true, planBar: true, unitLt25: false, deadEnd: true,
     isoScale: 1000, planScale: 500, isoFrame: 'shared', planFrame: 'fit',
     maxL: 112.5, maxD: 20, maxS: 6, dpi: '300',
@@ -534,6 +535,7 @@
       overrun: val('overrun'),
       context: val('context'),
       isoDims: val('isoDims'),
+      storeyDim: val('storeyDim'),
       planLabels: val('planLabels'),
       planDoors: val('planDoors'),
       planTravel: val('planTravel'),
@@ -1029,6 +1031,30 @@
       c.line(da, db, INK, 0.18); tick(da); tick(db);
       const dm = [(da[0] + db[0]) / 2 + 0.866 * 3.2, (da[1] + db[1]) / 2 + 0.5 * 3.2];
       c.text(dm[0], dm[1] + 0.8, 2.4, fmtM(D), { anchor: 'middle', rot: -30 });
+    }
+
+    // Storeys dimension: its own line with a tick at every floor, labelled with the storey count.
+    // Independent of the other dimensions; stacks outside the height dimension when both are on.
+    if (p.storeyDim) {
+      const a = P(0, D, H), b = P(0, D, 0);
+      let xd = b[0] - 6;
+      if (p.isoDims) {
+        const storeysTxt0 = `${p.storeys} storey${p.storeys === 1 ? '' : 's'}`;
+        const labs = p.hlabel === 'both' ? [[fmtM(H), 2.6], [storeysTxt0, 2.1]] : [[p.hlabel === 'storeys' ? storeysTxt0 : fmtM(H), 2.6]];
+        const lw = Math.max(...labs.map(([t, sz]) => textW(t, sz)));
+        xd = xd - 1.8 - lw - 4.5;
+      }
+      const ext = '#8C969F', tk = 0.75;
+      c.line([a[0] - 1, a[1]], [xd - 1.2, a[1]], ext, 0.12);
+      c.line([b[0] - 1, b[1]], [xd - 1.2, b[1]], ext, 0.12);
+      c.line([xd, a[1]], [xd, b[1]], INK, 0.18);
+      for (let i = 0; i <= p.storeys; i++) {
+        const y = P(0, D, i * fh)[1];
+        if (i === 0 || i === p.storeys) c.line([xd - tk, y + tk], [xd + tk, y - tk], INK, 0.3);
+        else c.line([xd - 0.7, y], [xd + 0.7, y], INK, 0.18);
+      }
+      const label = `${p.storeys} storey${p.storeys === 1 ? '' : 's'}`;
+      c.text(xd - 1.4, (a[1] + b[1]) / 2, 2.4, label, { anchor: 'middle', rot: -90, weight: 600 });
     }
 
     return { els: c.els, bb: c.bb, anchor: P(L, D, 0), defs: '' };
